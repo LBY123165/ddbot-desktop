@@ -1,0 +1,22 @@
+<service>
+  <id>ddbot-webui</id>
+  <name>DDBOT WebUI Service</name>
+  <description>DDBOT-WSa Web管理界面服务</description>
+  <executable>%BASE%\backend\target\release\ddbot-backend.exe</executable>
+  <arguments></arguments>
+  <workingdirectory>%BASE%\backend</workingdirectory>
+  <logmode>rotate</logmode>
+  <logpath>%BASE%\logs</logpath>
+  
+  <!-- 自动重启配置 -->
+  <onfailure action="restart" delay="10 sec"/>
+  <onfailure action="restart" delay="20 sec"/>
+  <onfailure action="none"/>
+  
+  <!-- 环境变量 -->
+  <env name="RUST_LOG" value="info"/>
+  <env name="PORT" value="3000"/>
+  
+  <!-- 启动后等待时间 -->
+  <startuptimelimit>60 sec</startuptimelimit>
+</service>

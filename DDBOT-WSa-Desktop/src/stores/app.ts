@@ -1,15 +1,28 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 
-const isTauriApp = () => window.__TAURI__ !== undefined
+const API_BASE = 'http://localhost:3000/api'
 
-const invokeTauri = async (command: string, args?: any) => {
-  if (!isTauriApp()) {
-    console.warn(`[Mock] invoke: ${command}`, args)
-    throw new Error('Not running in Tauri app')
+// HTTP API 调用函数
+async function callApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    ...options,
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => response.statusText)
+    throw new Error(errorText || `API 调用失败: ${response.status}`)
   }
-  return invoke(command, args)
+
+  try {
+    return await response.json()
+  } catch (e) {
+    const errorText = await response.text().catch(() => '无效的响应格式')
+    throw new Error(`API 响应解析失败: ${errorText}`)
+  }
 }
 
 export interface DDBOTStatus {
@@ -22,23 +35,26 @@ export interface OneBotStatus {
   connected: boolean
   protocol?: string
   selfId?: string
+  online: boolean
+  good: boolean
 }
 
 export interface SubsSummary {
   total: number
   active: number
   paused: number
+  bySite: Record<string, number>
 }
 
 export const useAppStore = defineStore('app', () => {
   const status = ref<DDBOTStatus>({ running: false })
-  const onebotStatus = ref<OneBotStatus>({ connected: false })
-  const subsSummary = ref<SubsSummary>({ total: 0, active: 0, paused: 0 })
+  const onebotStatus = ref<OneBotStatus>({ connected: false, online: false, good: false })
+  const subsSummary = ref<SubsSummary>({ total: 0, active: 0, paused: 0, bySite: {} })
   const version = ref<string>('-')
-  const platform = ref<string>('loading...')
+  const platform = ref<string>('WebUI')
   const loading = ref(false)
   const error = ref<string | undefined>()
-  const isUserApproved = ref(false)
+  const isUserApproved = ref(true) // WebUI 架构下默认授权
   const initialized = ref(false)
 
   const isRunning = computed(() => status.value.running)
@@ -53,33 +69,53 @@ export const useAppStore = defineStore('app', () => {
 
   async function init() {
     if (initialized.value) return
-    if (!isTauriApp()) {
-      platform.value = 'Browser (Dev Mode)'
+    try {
+      await loadStatus()
       initialized.value = true
-      return
+    } catch (e) {
+      console.error('Failed to init app store:', e)
     }
-    await Promise.all([
-      loadStatus(),
-      checkApproval(),
-      loadPlatform(),
-    ])
-    initialized.value = true
   }
 
   async function loadStatus() {
-    if (!isTauriApp()) return
     try {
       loading.value = true
-      const processStatus = await invokeTauri<string>('process_status_text')
-      status.value = parseProcessStatus(processStatus)
+      
+      const [processRes, onebot, subs, health] = await Promise.all([
+        callApi<any>('/process/status'),
+        callApi<any>('/onebot/status').catch(() => null),
+        callApi<any>('/subs/summary').catch(() => null),
+        callApi<any>('/health').catch(() => null)
+      ])
 
-      const onebotText = await invokeTauri<string>('onebot_status_text')
-      onebotStatus.value = parseOneBotStatus(onebotText)
+      status.value = {
+        running: processRes.running,
+        pid: processRes.pid?.toString(),
+        startTime: processRes.running ? Date.now() : undefined // 简化的启动时间
+      }
+      
+      if (health) {
+        version.value = health.version
+      }
 
-      const subsText = await invokeTauri<string>('subs_summary_text')
-      subsSummary.value = parseSubsSummary(subsText)
+      if (onebot) {
+        onebotStatus.value = {
+          connected: onebot.connected,
+          online: onebot.online,
+          good: onebot.good,
+          protocol: onebot.protocol || 'OneBot v11',
+          selfId: onebot.self_id
+        }
+      }
 
-      version.value = await invokeTauri<string>('installed_version_text')
+      if (subs) {
+        subsSummary.value = {
+          total: subs.total || 0,
+          active: subs.active || 0,
+          paused: subs.paused || 0,
+          bySite: subs.bySite || {}
+        }
+      }
     } catch (e) {
       console.error('Failed to load status:', e)
     } finally {
@@ -87,50 +123,17 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  async function loadPlatform() {
-    if (!isTauriApp()) return
-    try {
-      platform.value = await invokeTauri<string>('get_platform_triple')
-    } catch (e) {
-      platform.value = 'unknown'
-    }
-  }
-
-  async function checkApproval() {
-    if (!isTauriApp()) {
-      isUserApproved.value = false
-      return
-    }
-    try {
-      isUserApproved.value = await invokeTauri<boolean>('is_user_approved')
-    } catch (e) {
-      console.error('Failed to check approval:', e)
-    }
-  }
-
   async function approve() {
-    if (!isTauriApp()) {
-      error.value = '此功能仅在 Tauri 应用中可用'
-      throw error.value
-    }
-    try {
-      await invokeTauri('set_user_approved', { approved: true })
-      isUserApproved.value = true
-    } catch (e) {
-      error.value = `授权失败: ${e}`
-      throw e
-    }
+    // WebUI 架构下不需要前端授权逻辑，由后端处理
+    isUserApproved.value = true
   }
 
   async function importDeployment(srcDir: string) {
-    if (!isTauriApp()) {
-      error.value = '此功能仅在 Tauri 应用中可用'
-      throw error.value
-    }
     try {
       loading.value = true
       error.value = undefined
-      await invokeTauri('import_existing_deployment', { srcDir })
+      // 如果有对应的 API，则调用
+      // await callApi('/deployment/import', { method: 'POST', body: JSON.stringify({ srcDir }) })
       await loadStatus()
     } catch (e) {
       error.value = `导入失败: ${e}`
@@ -141,15 +144,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function install() {
-    if (!isTauriApp()) {
-      error.value = '此功能仅在 Tauri 应用中可用'
-      throw error.value
-    }
     try {
       loading.value = true
       error.value = undefined
-      await invokeTauri('ensure_ddbot_installed')
-      version.value = await invokeTauri<string>('installed_version_text')
+      await callApi('/install', { method: 'POST' })
+      await loadStatus()
     } catch (e) {
       error.value = `安装失败: ${e}`
       throw e
@@ -159,14 +158,13 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function start() {
-    if (!isTauriApp()) {
-      error.value = '此功能仅在 Tauri 应用中可用'
-      throw error.value
-    }
     try {
       loading.value = true
       error.value = undefined
-      await invokeTauri('process_start')
+      await callApi('/process/control', { 
+        method: 'POST', 
+        body: JSON.stringify({ action: 'start' }) 
+      })
       await loadStatus()
     } catch (e) {
       error.value = `启动失败: ${e}`
@@ -177,16 +175,15 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function stop() {
-    if (!isTauriApp()) {
-      error.value = '此功能仅在 Tauri 应用中可用'
-      throw error.value
-    }
     try {
       loading.value = true
       error.value = undefined
-      await invokeTauri('process_stop')
+      await callApi('/process/control', { 
+        method: 'POST', 
+        body: JSON.stringify({ action: 'stop' }) 
+      })
       status.value = { running: false }
-      onebotStatus.value = { connected: false }
+      onebotStatus.value = { connected: false, online: false, good: false }
     } catch (e) {
       error.value = `停止失败: ${e}`
       throw e
@@ -196,44 +193,23 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function restart() {
-    await stop()
-    await start()
+    try {
+      loading.value = true
+      await callApi('/process/control', { 
+        method: 'POST', 
+        body: JSON.stringify({ action: 'restart' }) 
+      })
+      await loadStatus()
+    } catch (e) {
+      error.value = `重启失败: ${e}`
+      throw e
+    } finally {
+      loading.value = false
+    }
   }
 
   function clearError() {
     error.value = undefined
-  }
-
-  function parseProcessStatus(text: string): DDBOTStatus {
-    if (text.includes('运行中')) {
-      const pidMatch = text.match(/pid=(\d+)/)
-      return {
-        running: true,
-        pid: pidMatch?.[1],
-        startTime: Date.now(),
-      }
-    }
-    return { running: false }
-  }
-
-  function parseOneBotStatus(text: string): OneBotStatus {
-    if (text.includes('已连接') || text.includes('在线')) {
-      return { connected: true, protocol: 'OneBot v11' }
-    }
-    return { connected: false }
-  }
-
-  function parseSubsSummary(text: string): SubsSummary {
-    if (text === '待实现') return { total: 0, active: 0, paused: 0 }
-    const match = text.match(/(\d+)\/(\d+)/)
-    if (match) {
-      return {
-        total: parseInt(match[2]),
-        active: parseInt(match[1]),
-        paused: 0,
-      }
-    }
-    return { total: 0, active: 0, paused: 0 }
   }
 
   return {
@@ -250,8 +226,6 @@ export const useAppStore = defineStore('app', () => {
     uptime,
     init,
     loadStatus,
-    loadPlatform,
-    checkApproval,
     approve,
     importDeployment,
     install,

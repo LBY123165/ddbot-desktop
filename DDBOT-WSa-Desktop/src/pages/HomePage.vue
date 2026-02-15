@@ -135,21 +135,34 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { Activity, AlertCircle, AlertTriangle, Database, Download, Link, Play, RefreshCw, Square, Tag } from 'lucide-vue-next'
 import Button from '../components/Button.vue'
 import { useAppStore } from '../stores/app'
 
+const router = useRouter()
 const appStore = useAppStore()
 
 let statusInterval: number | null = null
 
 onMounted(async () => {
   await appStore.init()
+  
+  if (!appStore.isUserApproved) {
+    router.push('/setup')
+    return
+  }
 
   statusInterval = window.setInterval(() => {
     appStore.loadStatus()
   }, 5000) as unknown as number
+})
+
+watch(() => appStore.isUserApproved, (approved) => {
+  if (!approved) {
+    router.push('/setup')
+  }
 })
 
 onUnmounted(() => {

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API 测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0b1020;
+            color: #e8eaf0;
+        }
+        .test-section {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        button {
+            background: #7c5cff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #9d7fff;
+        }
+        .result {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success { border-left: 4px solid #10b981; }
+        .error { border-left: 4px solid #ef4444; }
+    </style>
+</head>
+<body>
+    <h1>DDBOT WebUI API 测试</h1>
+    
+    <div class="test-section">
+        <h2>健康检查</h2>
+        <button onclick="testHealth()">测试 /api/health</button>
+        <div id="health-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>进程状态</h2>
+        <button onclick="testProcessStatus()">测试 /api/process/status</button>
+        <div id="process-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>OneBot 状态</h2>
+        <button onclick="testOneBotStatus()">测试 /api/onebot/status</button>
+        <div id="onebot-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>订阅统计</h2>
+        <button onclick="testSubsSummary()">测试 /api/subs/summary</button>
+        <div id="subs-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>进程控制</h2>
+        <button onclick="testStartProcess()">启动进程</button>
+        <button onclick="testStopProcess()">停止进程</button>
+        <div id="control-result" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api';
+        
+        async function callApi(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    ...options,
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                return { success: true, data };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+        
+        function displayResult(elementId, result) {
+            const element = document.getElementById(elementId);
+            if (result.success) {
+                element.className = 'result success';
+                element.textContent = JSON.stringify(result.data, null, 2);
+            } else {
+                element.className = 'result error';
+                element.textContent = `错误: ${result.error}`;
+            }
+        }
+        
+        async function testHealth() {
+            const result = await callApi('/health');
+            displayResult('health-result', result);
+        }
+        
+        async function testProcessStatus() {
+            const result = await callApi('/process/status');
+            displayResult('process-result', result);
+        }
+        
+        async function testOneBotStatus() {
+            const result = await callApi('/onebot/status');
+            displayResult('onebot-result', result);
+        }
+        
+        async function testSubsSummary() {
+            const result = await callApi('/subs/summary');
+            displayResult('subs-result', result);
+        }
+        
+        async function testStartProcess() {
+            const result = await callApi('/process/control', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'start' })
+            });
+            displayResult('control-result', result);
+        }
+        
+        async function testStopProcess() {
+            const result = await callApi('/process/control', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'stop' })
+            });
+            displayResult('control-result', result);
+        }
+        
+        // 页面加载时自动测试健康检查
+        window.addEventListener('load', testHealth);
+    </script>
+</body>
+</html>

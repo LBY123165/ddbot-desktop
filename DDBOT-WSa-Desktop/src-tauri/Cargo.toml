@@ -34,6 +34,8 @@ zip = "2.2.2"
 tar = "0.4.44"
 flate2 = "1.1.9"
 walkdir = "2.5.0"
+rusqlite = { version = "0.38.0", features = ["bundled"] }
+chrono = "0.4.43"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", features = ["Win32_System_Threading", "Win32_Foundation"] }

@@ -3,6 +3,9 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import HomePage from '../pages/HomePage.vue'
 import SettingsPage from '../pages/SettingsPage.vue'
 import SetupWizard from '../pages/SetupWizard.vue'
+import ConfigEditor from '../pages/ConfigEditor.vue'
+import LogViewer from '../pages/LogViewer.vue'
+import TemplateCenter from '../pages/TemplateCenter.vue'
 
 const routes = [
   {
@@ -10,6 +13,24 @@ const routes = [
     name: 'Home',
     component: HomePage,
     meta: { title: '概览' },
+  },
+  {
+    path: '/config',
+    name: 'Config',
+    component: ConfigEditor,
+    meta: { title: '配置编辑' },
+  },
+  {
+    path: '/logs',
+    name: 'Logs',
+    component: LogViewer,
+    meta: { title: '日志查看' },
+  },
+  {
+    path: '/templates',
+    name: 'Templates',
+    component: TemplateCenter,
+    meta: { title: '模板中心' },
   },
   {
     path: '/settings',

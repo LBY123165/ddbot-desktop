@@ -3,6 +3,9 @@
 mod ddbot;
 mod process;
 
+use std::fs;
+use std::path::PathBuf;
+
 #[tauri::command]
 fn get_platform_triple() -> String {
   format!(
@@ -63,6 +66,26 @@ async fn ensure_ddbot_installed() -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn read_config_file(filename: String) -> Result<String, String> {
+  ddbot::read_config_file(&filename).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn write_config_file(filename: String, content: String) -> Result<(), String> {
+  ddbot::write_config_file(&filename, &content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn call_onebot_status_api() -> Result<serde_json::Value, String> {
+  process::call_onebot_status_api().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn call_subs_summary_api() -> Result<serde_json::Value, String> {
+  process::call_subs_summary_api().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn process_start() -> Result<(), String> {
   process::start().await.map_err(|e| e.to_string())
 }
@@ -97,6 +120,53 @@ async fn installed_version_text() -> Result<String, String> {
   Ok(ddbot::installed_version_text().await)
 }
 
+#[tauri::command]
+async fn read_logs_tail(lines: usize) -> Result<Vec<String>, String> {
+  ddbot::read_logs_tail(lines).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn list_config_backups(filename: String) -> Result<Vec<String>, String> {
+  ddbot::list_config_backups(&filename).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn restore_config_backup(backup_name: String) -> Result<(), String> {
+  ddbot::restore_config_backup(&backup_name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn download_file(url: String, save_path: String, filename: Option<String>) -> Result<String, String> {
+  use reqwest::Client;
+  
+  let client = Client::new();
+  let resp = client
+    .get(&url)
+    .header("User-Agent", "DDBOT-WSa-Desktop")
+    .send()
+    .await
+    .map_err(|e| format!("下载请求失败: {}", e))?
+    .error_for_status()
+    .map_err(|e| format!("HTTP 错误: {}", e))?;
+  
+  let bytes = resp.bytes().await.map_err(|e| format!("读取响应失败: {}", e))?;
+  
+  let save_path = PathBuf::from(save_path);
+  fs::create_dir_all(&save_path).map_err(|e| format!("创建目录失败: {}", e))?;
+  
+  let filename = filename.unwrap_or_else(|| {
+    url.split('/')
+      .last()
+      .unwrap_or("downloaded_file")
+      .to_string()
+  });
+  
+  let file_path = save_path.join(filename);
+  fs::write(&file_path, bytes).map_err(|e| format!("写入文件失败: {}", e))?;
+  
+  Ok(file_path.to_string_lossy().to_string())
+}
+
 fn main() {
   env_logger::init();
   
@@ -117,6 +187,10 @@ fn main() {
       set_user_approved,
       import_existing_deployment,
       ensure_ddbot_installed,
+      read_config_file,
+      write_config_file,
+      call_onebot_status_api,
+      call_subs_summary_api,
       process_start,
       process_stop,
       process_restart,
@@ -124,6 +198,10 @@ fn main() {
       onebot_status_text,
       subs_summary_text,
       installed_version_text,
+      read_logs_tail,
+      list_config_backups,
+      restore_config_backup,
+      download_file,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

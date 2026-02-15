@@ -10,13 +10,16 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { RouterView } from 'vue-router'
+import { useRouter } from 'vue-router'
 import Navigation from './components/NavigationPage.vue'
 import { useAppStore } from './stores/app'
 
 const appStore = useAppStore()
+const router = useRouter()
 
 onMounted(async () => {
   await appStore.init()
+  // WebUI 模式下不需要检查授权状态
 })
 </script>
 

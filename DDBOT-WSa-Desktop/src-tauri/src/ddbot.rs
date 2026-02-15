@@ -1,9 +1,12 @@
 use anyhow::{anyhow, Context, Result};
+use rusqlite::{Connection, OpenFlags};
 use flate2::read::GzDecoder;
 use rand::{distributions::Alphanumeric, Rng};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_yaml::{Mapping, Value};
+use chrono::{DateTime, Local};
+use std::collections::HashMap;
 use std::fs;
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
@@ -108,6 +111,158 @@ fn write_installed_info(info: &InstalledInfo) -> Result<()> {
 pub fn ensure_managed_dirs() -> Result<()> {
   fs::create_dir_all(managed_ddbot_dir())?;
   Ok(())
+}
+
+pub fn read_config_file(filename: &str) -> Result<String> {
+  ensure_managed_dirs()?;
+  let path = managed_ddbot_dir().join(filename);
+  if path.exists() {
+    fs::read_to_string(path).map_err(|e| anyhow!("读取配置文件失败: {}", e))
+  } else {
+    // 如果文件不存在，返回默认模板
+    Ok(get_default_config_template(filename))
+  }
+}
+
+pub fn write_config_file(filename: &str, content: &str) -> Result<()> {
+  ensure_managed_dirs()?;
+  let path = managed_ddbot_dir().join(filename);
+  
+  // 创建带时间戳的备份
+  if path.exists() {
+    let backups_dir = managed_ddbot_dir().join("backups");
+    if !backups_dir.exists() {
+      fs::create_dir_all(&backups_dir)?;
+    }
+    let now: DateTime<Local> = Local::now();
+    let timestamp = now.format("%Y%m%d_%H%M%S").to_string();
+    let backup_name = format!("{}.{}.bak", filename, timestamp);
+    let backup_path = backups_dir.join(backup_name);
+    fs::copy(&path, &backup_path)?;
+  }
+  
+  fs::write(path, content).map_err(|e| anyhow!("写入配置文件失败: {}", e))
+}
+
+pub fn list_config_backups(filename: &str) -> Result<Vec<String>> {
+  let backups_dir = managed_ddbot_dir().join("backups");
+  if !backups_dir.exists() {
+    return Ok(vec![]);
+  }
+
+  let mut backups = Vec::new();
+  for entry in fs::read_dir(backups_dir)? {
+    let entry = entry?;
+    let path = entry.path();
+    if path.is_file() {
+      if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+        if name.starts_with(filename) && name.ends_with(".bak") {
+          backups.push(name.to_string());
+        }
+      }
+    }
+  }
+  backups.sort_by(|a, b| b.cmp(a)); // 按时间降序
+  Ok(backups)
+}
+
+pub fn restore_config_backup(backup_name: &str) -> Result<()> {
+  let backups_dir = managed_ddbot_dir().join("backups");
+  let backup_path = backups_dir.join(backup_name);
+  if !backup_path.exists() {
+    return Err(anyhow!("备份文件不存在"));
+  }
+
+  // 假设备份文件名格式为 filename.timestamp.bak
+  let parts: Vec<&str> = backup_name.split('.').collect();
+  if parts.len() < 3 {
+    return Err(anyhow!("无效的备份文件名格式"));
+  }
+  let original_filename = parts[0];
+  let target_path = managed_ddbot_dir().join(original_filename);
+
+  fs::copy(backup_path, target_path)?;
+  Ok(())
+}
+
+pub async fn read_logs_tail(lines: usize) -> Result<Vec<String>> {
+  let log_dir = managed_ddbot_dir().join("logs");
+  let log_path = log_dir.join("latest.log");
+  
+  if !log_path.exists() {
+    return Ok(vec![]);
+  }
+  
+  let content = fs::read_to_string(&log_path).map_err(|e| anyhow!("读取日志文件失败: {}", e))?;
+  let all_lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+  let start = if all_lines.len() > lines {
+    all_lines.len() - lines
+  } else {
+    0
+  };
+  
+  Ok(all_lines[start..].to_vec())
+}
+
+pub fn get_subs_summary_from_db() -> Result<HashMap<String, u32>> {
+    let db_path = managed_ddbot_dir().join(".lsp.db");
+    if !db_path.exists() {
+        return Ok(HashMap::new());
+    }
+
+    // 只读方式打开，不检查锁，因为我们只是读取统计信息
+    let conn = Connection::open_with_flags(
+        &db_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    ).map_err(|e| anyhow!("无法打开数据库: {}", e))?;
+
+    let mut stmt = conn.prepare("SELECT site, COUNT(*) as count FROM subs GROUP BY site")
+        .map_err(|e| anyhow!("查询失败: {}", e))?;
+
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, u32>(1)?))
+    }).map_err(|e| anyhow!("读取结果失败: {}", e))?;
+
+    let mut summary = HashMap::new();
+    for row in rows {
+        if let Ok((site, count)) = row {
+            summary.insert(site, count);
+        }
+    }
+
+    Ok(summary)
+}
+
+fn get_default_config_template(filename: &str) -> String {
+  match filename {
+    "application.yaml" => {
+      r#"# DDBOT-WSa 配置文件
+# 请根据需要修改配置
+
+# 基础配置
+log_level: info
+
+# Admin API 配置
+admin:
+  enable: false
+  addr: "127.0.0.1:15631"
+  token: ""
+
+# 其他配置...
+"#.to_string()
+    },
+    "template.yaml" => {
+      r#"# 模板配置文件
+# 在这里定义您的模板配置
+
+templates:
+  - name: "默认模板"
+    content: |
+      这是一个示例模板
+"#.to_string()
+    },
+    _ => "".to_string()
+  }
 }
 
 pub fn ensure_default_config_exists() -> Result<()> {

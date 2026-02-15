@@ -5,8 +5,8 @@
   "identifier": "icu.tane.ddbot.wsa.desktop",
   "build": {
     "beforeDevCommand": "yarn run dev",
-    "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "yarn run web:build",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "yarn run build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -24,7 +24,13 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": [
+        "core:default",
+        "dialog:default",
+        "shell:default",
+        "opener:default"
+      ]
     }
   },
   "bundle": {
@@ -32,5 +38,10 @@
     "icon": ["icons/icon.ico", "icons/icon.png"],
     "resources": []
   },
-  "plugins": {}
+  "plugins": {
+    "dialog": {},
+    "shell": {},
+    "opener": {},
+    "tray-icon": {}
+  }
 }

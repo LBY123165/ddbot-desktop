@@ -122,13 +122,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { open } from '@tauri-apps/plugin-dialog'
 import Button from '../components/Button.vue'
 import { useAppStore } from '../stores/app'
-
-const invokeTauri = (command: string, args?: any) => {
-  return window.__TAURI__.core.invoke(command, args)
-}
 
 const router = useRouter()
 const appStore = useAppStore()
@@ -145,22 +140,16 @@ const canProceed = computed(() => {
 })
 
 onMounted(async () => {
-  await appStore.loadPlatform()
+  // WebUI 架构下通常由设置页管理路径，此处逻辑保持简单
+  if (appStore.isUserApproved) {
+    // router.push('/')
+  }
 })
 
 async function selectDirectory() {
-  try {
-    const dir = await open({
-      directory: true,
-      multiple: false,
-      title: '选择 DDBOT-WSa 部署目录',
-    })
-    if (dir) {
-      selectedDir.value = dir as string
-    }
-  } catch (e) {
-    console.error('Failed to select directory:', e)
-  }
+  // WebUI 模式下无法直接调用系统对话框
+  // 建议引导用户在设置页面输入路径
+  alert('WebUI 模式请在主程序启动后，进入设置页面手动配置路径。')
 }
 
 async function handleNext() {

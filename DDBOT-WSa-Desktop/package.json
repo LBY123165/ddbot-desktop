@@ -5,10 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "web:build": "vue-tsc --noEmit && vite build",
-    "tauri:dev": "tauri dev",
-    "build": "tauri build",
-    "lint": "eslint --ext .ts,.tsx,.vue src/"
+    "tauri": "tauri",
+    "dev:tauri": "tauri dev",
+    "build:tauri": "tauri build",
+    "dev:backend": "cd backend && cargo run",
+    "dev:both": "concurrently \"npm run dev\" \"npm run dev:backend\"",
+    "build": "vite build",
+    "build:frontend": "vite build",
+    "build:backend": "cd backend && cargo build --release",
+    "preview": "vite preview",
+    "lint": "eslint --ext .ts,.tsx,.vue src/",
+    "service:install": "powershell -ExecutionPolicy Bypass -File ./scripts/install-service.ps1",
+    "service:uninstall": "powershell -ExecutionPolicy Bypass -File ./scripts/uninstall-service.ps1"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
