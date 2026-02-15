@@ -1,34 +1,61 @@
 <template>
-  <div class="logs">
+  <div class="logs-page">
     <div class="card">
       <div class="card__header">
         <div>
           <div class="card__title">日志查看器</div>
-          <div class="card__subtitle">DDBOT-WSa 运行日志</div>
+          <div class="card__subtitle">查看 DDBOT-WSa 运行日志</div>
         </div>
         <div class="actions">
-          <Button :icon="RefreshCw" :loading="loading" @click="loadLogs">刷新</Button>
-          <Button variant="secondary" :icon="Trash" @click="clearLogs">清空</Button>
+          <div class="toolbar-group">
+            <label class="toolbar-label">日志来源:</label>
+            <Select v-model="selectedSource" @change="loadLogs">
+              <Option value="ddbot">DDBOT</Option>
+              <Option value="app">应用</Option>
+              <Option value="all">全部</Option>
+            </Select>
+          </div>
+          <div class="toolbar-group">
+            <label class="toolbar-label">显示行数:</label>
+            <InputNumber v-model="logLines" :min="50" :max="1000" :step="50" @change="loadLogs" />
+          </div>
+          <Button :icon="RefreshCw" :loading="refreshing" @click="loadLogs">刷新</Button>
+          <Button :icon="Trash2" variant="danger" @click="clearLogs">清除日志</Button>
+          <Button :icon="Eye" :loading="following" @click="toggleFollow">
+            {{ following ? '停止跟随' : '跟随日志' }}
+          </Button>
         </div>
       </div>
 
-      <div class="card__body">
-        <div v-if="logs.length === 0 && !loading" class="empty">
-          <div class="empty__icon">📝</div>
-          <div class="empty__text">暂无日志</div>
+      <div class="logs-container">
+        <div v-if="loading" class="loading-container">
+          <div class="loading-spinner"></div>
+          <div>加载日志中...</div>
         </div>
-
-        <div v-else class="logs__container">
-          <div
-            v-for="(log, index) in logs"
-            :key="index"
-            class="log-entry"
-            :class="`log-entry--${log.level}`"
-          >
-            <div class="log-entry__time">{{ formatTime(log.time) }}</div>
-            <div class="log-entry__level">{{ log.level }}</div>
-            <div class="log-entry__content">{{ log.message }}</div>
+        <div v-else-if="error" class="error-container">
+          <AlertCircle :size="24" />
+          <div>{{ error }}</div>
+          <Button variant="secondary" @click="loadLogs">重试</Button>
+        </div>
+        <div v-else class="logs-content">
+          <div class="logs-header">
+            <div class="logs-info">
+              <span>当前来源: {{ selectedSource === 'all' ? '全部' : selectedSource === 'ddbot' ? 'DDBOT' : '应用' }}</span>
+              <span>显示行数: {{ logLines }}</span>
+              <span v-if="lastUpdated">最后更新: {{ lastUpdated }}</span>
+            </div>
           </div>
+          <div class="logs-body" ref="logsContainer">
+            <div v-if="logs.length === 0" class="logs-empty">暂无日志</div>
+            <pre class="logs-text" v-else>{{ logs.join('\n') }}</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="card__footer">
+        <div class="footer-info">
+          <span v-if="following" class="follow-indicator">📝 正在跟随日志</span>
+          <span class="log-stats">{{ logs.length }} 行日志</span>
         </div>
       </div>
     </div>
@@ -36,72 +63,142 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { RefreshCw, Trash } from 'lucide-vue-next'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { RefreshCw, Trash2, AlertCircle, Eye } from 'lucide-vue-next'
 import Button from '../components/Button.vue'
-import { useAppStore } from '../stores/app'
+import Select from '../components/Select.vue'
+import Option from '../components/Option.vue'
+import InputNumber from '../components/InputNumber.vue'
+import { TauriAPI } from '../api/tauri'
 
-const appStore = useAppStore()
+// 状态管理
+const logs = ref<string[]>([])
 const loading = ref(false)
+const refreshing = ref(false)
+const error = ref<string | undefined>()
+const selectedSource = ref<'ddbot' | 'app' | 'all'>('ddbot')
+const logLines = ref(200)
+const following = ref(true)
+const lastUpdated = ref<string | undefined>()
+const logsContainer = ref<HTMLElement | null>(null)
 
-interface LogEntry {
-  time: Date
-  level: 'info' | 'warn' | 'error'
-  message: string
+// 自动刷新定时器
+let autoRefreshTimer: number | undefined
+
+// 加载日志
+async function loadLogs() {
+  try {
+    if (refreshing.value) return
+    
+    refreshing.value = true
+    error.value = undefined
+    
+    // 使用 readLogsTail 获取指定行数的日志
+    const logContent = await TauriAPI.ddbot.readLogsTail(logLines.value)
+    logs.value = logContent
+    
+    lastUpdated.value = new Date().toLocaleTimeString()
+    
+    // 如果启用了跟随，滚动到底部
+    if (following.value) {
+      scrollToBottom()
+    }
+  } catch (e) {
+    error.value = `加载日志失败: ${e}`
+    console.error('Failed to load logs:', e)
+  } finally {
+    loading.value = false
+    refreshing.value = false
+  }
 }
 
-const logs = ref<LogEntry[]>([])
-
-onMounted(() => {
-  loadLogs()
-})
-
-async function loadLogs() {
-  loading.value = true
+// 清除日志
+async function clearLogs() {
+  if (!confirm('确定要清除当前来源的日志吗？此操作不可恢复。')) {
+    return
+  }
+  
   try {
-    // TODO: Implement actual log reading from DDBOT-WSa log files
-    // For now, show placeholder logs
-    logs.value = [
-      {
-        time: new Date(),
-        level: 'info',
-        message: 'DDBOT-WSa 桌面管理器已启动'
-      },
-      {
-        time: new Date(Date.now() - 60000),
-        level: 'info',
-        message: '正在检查运行状态...'
-      },
-    ]
+    loading.value = true
+    error.value = undefined
+    
+    await TauriAPI.logs.clear(selectedSource.value)
+    logs.value = []
+    lastUpdated.value = new Date().toLocaleTimeString()
   } catch (e) {
-    console.error('Failed to load logs:', e)
+    error.value = `清除日志失败: ${e}`
+    console.error('Failed to clear logs:', e)
   } finally {
     loading.value = false
   }
 }
 
-function clearLogs() {
-  logs.value = []
+// 切换跟随日志
+function toggleFollow() {
+  following.value = !following.value
+  if (following.value) {
+    scrollToBottom()
+  }
 }
 
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  })
+// 滚动到底部
+function scrollToBottom() {
+  setTimeout(() => {
+    if (logsContainer.value) {
+      logsContainer.value.scrollTop = logsContainer.value.scrollHeight
+    }
+  }, 100)
 }
+
+// 自动刷新日志
+function startAutoRefresh() {
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer)
+  }
+  
+  autoRefreshTimer = window.setInterval(() => {
+    if (following.value) {
+      loadLogs()
+    }
+  }, 3000) // 每3秒刷新一次
+}
+
+// 停止自动刷新
+function stopAutoRefresh() {
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer)
+    autoRefreshTimer = undefined
+  }
+}
+
+// 监听跟随状态变化
+watch(following, (newValue) => {
+  if (newValue) {
+    startAutoRefresh()
+  } else {
+    stopAutoRefresh()
+  }
+})
+
+// 组件挂载
+onMounted(() => {
+  loadLogs()
+  if (following.value) {
+    startAutoRefresh()
+  }
+})
+
+// 组件卸载
+onUnmounted(() => {
+  stopAutoRefresh()
+})
 </script>
 
 <style scoped>
-.logs {
+.logs-page {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 22px;
-  max-width: 1400px;
-  margin: 0 auto;
-  width: 100%;
 }
 
 .card {
@@ -114,10 +211,12 @@ function formatTime(date: Date): string {
 
 .card__header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 16px;
   padding: 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-wrap: wrap;
 }
 
 .card__title {
@@ -131,93 +230,161 @@ function formatTime(date: Date): string {
   opacity: 0.7;
 }
 
+.card__footer {
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.15);
+}
+
 .actions {
   display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.card__body {
-  padding: 0;
-  max-height: 600px;
-  overflow: hidden;
+.toolbar-label {
+  font-size: 13px;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+.logs-container {
+  height: calc(100vh - 240px);
+  min-height: 400px;
   display: flex;
   flex-direction: column;
 }
 
-.empty {
+.loading-container,
+.error-container {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 48px;
-  color: rgba(232, 234, 240, 0.6);
+  gap: 16px;
+  padding: 40px;
+  text-align: center;
 }
 
-.empty__icon {
-  font-size: 48px;
-  margin-bottom: 16px;
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #7c5cff;
+  border-radius: 50%;
+  animation: spin 1s infinite linear;
 }
 
-.empty__text {
-  font-size: 14px;
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-.logs__container {
-  overflow-y: auto;
-  padding: 16px;
+.logs-content {
   flex: 1;
-  max-height: 600px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.logs__container::-webkit-scrollbar {
-  width: 8px;
+.logs-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.1);
+  font-size: 12px;
 }
 
-.logs__container::-webkit-scrollbar-track {
+.logs-info {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.logs-body {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
   background: rgba(0, 0, 0, 0.2);
 }
 
-.logs__container::-webkit-scrollbar-thumb {
-  background: rgba(124, 92, 255, 0.4);
+.logs-empty {
+  text-align: center;
+  padding: 40px;
+  opacity: 0.5;
+  font-size: 14px;
+}
+
+.logs-text {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(232, 234, 240, 0.9);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.footer-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.follow-indicator {
+  color: #10b981;
+  font-weight: 500;
+}
+
+.log-stats {
+  opacity: 0.7;
+}
+
+/* 滚动条样式 */
+.logs-body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.logs-body::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
 }
 
-.log-entry {
-  display: grid;
-  grid-template-columns: 80px 70px 1fr;
-  gap: 12px;
-  padding: 8px 0;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+.logs-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
 }
 
-.log-entry__time {
-  color: rgba(232, 234, 240, 0.5);
+.logs-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
-.log-entry__level {
-  text-transform: uppercase;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.log-entry--info .log-entry__level {
-  color: rgba(0, 214, 160, 0.9);
-}
-
-.log-entry--warn .log-entry__level {
-  color: rgba(251, 191, 36, 0.9);
-}
-
-.log-entry--error .log-entry__level {
-  color: rgba(239, 68, 68, 0.9);
-}
-
-.log-entry__content {
-  color: rgba(232, 234, 240, 0.9);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .card__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .toolbar-group {
+    justify-content: space-between;
+  }
+  
+  .logs-container {
+    height: 500px;
+  }
 }
 </style>

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { TauriAPI } from '../api/tauri'
 
 const API_BASE = 'http://localhost:3000/api'
 
@@ -56,6 +57,11 @@ export const useAppStore = defineStore('app', () => {
   const error = ref<string | undefined>()
   const isUserApproved = ref(true) // WebUI 架构下默认授权
   const initialized = ref(false)
+  const firewallStatus = ref(false)
+  const updateAvailable = ref(false)
+  const latestVersion = ref<string>('-')
+  const lastUpdateCheck = ref<string | undefined>()
+  const dataDir = ref<string | undefined>()
 
   const isRunning = computed(() => status.value.running)
   const uptime = computed(() => {
@@ -71,6 +77,8 @@ export const useAppStore = defineStore('app', () => {
     if (initialized.value) return
     try {
       await loadStatus()
+      await loadFirewallStatus()
+      await loadDataDir()
       initialized.value = true
     } catch (e) {
       console.error('Failed to init app store:', e)
@@ -120,6 +128,31 @@ export const useAppStore = defineStore('app', () => {
       console.error('Failed to load status:', e)
     } finally {
       loading.value = false
+    }
+  }
+
+  async function loadFirewallStatus() {
+    try {
+      firewallStatus.value = await TauriAPI.firewall.check()
+    } catch (e) {
+      console.error('Failed to load firewall status:', e)
+      firewallStatus.value = false
+    }
+  }
+
+  async function loadDataDir() {
+    try {
+      dataDir.value = await TauriAPI.util.defaultDataDdbotDir()
+    } catch (e) {
+      console.error('Failed to load data dir:', e)
+    }
+  }
+
+  async function openDataDir() {
+    try {
+      await TauriAPI.files.openDDBotDataDir()
+    } catch (e) {
+      console.error('Failed to open data dir:', e)
     }
   }
 
@@ -222,10 +255,18 @@ export const useAppStore = defineStore('app', () => {
     error,
     isUserApproved,
     initialized,
+    firewallStatus,
+    updateAvailable,
+    latestVersion,
+    lastUpdateCheck,
+    dataDir,
     isRunning,
     uptime,
     init,
     loadStatus,
+    loadFirewallStatus,
+    loadDataDir,
+    openDataDir,
     approve,
     importDeployment,
     install,

@@ -11,6 +11,7 @@
           <div class="actions">
             <Button :icon="RefreshCw" :loading="appStore.loading" @click="appStore.loadStatus">刷新</Button>
             <Button variant="primary" :icon="Download" :loading="appStore.loading" @click="handleInstall">安装/更新</Button>
+            <Button variant="secondary" :icon="Settings" @click="$router.push('/settings')">设置</Button>
           </div>
         </div>
 
@@ -62,6 +63,30 @@
               <div class="kpi__detail mono">{{ appStore.platform }}</div>
             </div>
           </div>
+
+          <div class="kpi">
+            <div class="kpi__icon">
+              <Shield :size="20" />
+            </div>
+            <div>
+              <div class="kpi__label">防火墙状态</div>
+              <div class="kpi__value" :class="{ 'kpi__value--active': appStore.firewallStatus }">
+                {{ appStore.firewallStatus ? '已允许' : '未设置' }}
+              </div>
+              <div class="kpi__detail">{{ appStore.firewallStatus ? '规则已添加' : '需要添加规则' }}</div>
+            </div>
+          </div>
+
+          <div class="kpi">
+            <div class="kpi__icon">
+              <Clock :size="20" />
+            </div>
+            <div>
+              <div class="kpi__label">上次更新检查</div>
+              <div class="kpi__value">{{ appStore.lastUpdateCheck || '从未' }}</div>
+              <div class="kpi__detail">{{ appStore.updateAvailable ? '有新版本' : '已是最新' }}</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -97,6 +122,28 @@
           <Button variant="secondary" :icon="RefreshCw" :loading="appStore.loading" @click="appStore.restart">
             重启服务
           </Button>
+          <Button variant="secondary" :icon="FileText" @click="$router.push('/logs')">查看日志</Button>
+          <Button variant="secondary" :icon="FolderOpen" @click="appStore.openDataDir">打开数据目录</Button>
+        </div>
+      </div>
+
+      <!-- 订阅站点分布 -->
+      <div class="card">
+        <div class="card__header">
+          <div>
+            <div class="card__title">订阅站点分布</div>
+            <div class="card__subtitle">按站点分类的订阅数量</div>
+          </div>
+        </div>
+        <div class="stack">
+          <div v-if="Object.keys(appStore.subsSummary.bySite).length === 0" class="empty-state">
+            <Database :size="32" />
+            <div>暂无订阅数据</div>
+          </div>
+          <div v-else v-for="(count, site) in appStore.subsSummary.bySite" :key="site" class="row">
+            <div class="label">{{ site }}</div>
+            <div class="value">{{ count }}</div>
+          </div>
         </div>
       </div>
 
@@ -117,6 +164,11 @@
             <div class="label">下载源</div>
             <div class="value mono">cnxysoft/DDBOT-WSa</div>
           </div>
+          <div class="row">
+            <div class="label">数据目录</div>
+            <div class="value mono truncate">{{ appStore.dataDir || '未设置' }}</div>
+          </div>
+          <Button variant="secondary" :icon="Check" @click="handleCheckUpdate">检查更新</Button>
           <div v-if="!appStore.isUserApproved" class="warning">
             <AlertTriangle :size="16" />
             <span>尚未授权 Admin API，部分功能不可用</span>
@@ -131,15 +183,26 @@
       <span>{{ appStore.error }}</span>
       <Button size="sm" variant="danger" @click="appStore.clearError">关闭</Button>
     </div>
+
+    <!-- 更新提示 -->
+    <div v-if="appStore.updateAvailable" class="home__update">
+      <AlertCircle :size="16" />
+      <div>
+        <div class="update__title">发现新版本</div>
+        <div class="update__subtitle">{{ appStore.latestVersion }}</div>
+      </div>
+      <Button size="sm" variant="primary" @click="handleUpdate">更新</Button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Activity, AlertCircle, AlertTriangle, Database, Download, Link, Play, RefreshCw, Square, Tag } from 'lucide-vue-next'
+import { Activity, AlertCircle, AlertTriangle, Check, Clock, Database, Download, FileText, FolderOpen, Link, Play, RefreshCw, Shield, Settings, Square, Tag } from 'lucide-vue-next'
 import Button from '../components/Button.vue'
 import { useAppStore } from '../stores/app'
+import { TauriAPI } from '../api/tauri'
 
 const router = useRouter()
 const appStore = useAppStore()
@@ -157,6 +220,9 @@ onMounted(async () => {
   statusInterval = window.setInterval(() => {
     appStore.loadStatus()
   }, 5000) as unknown as number
+
+  // 检查更新
+  await handleCheckUpdate()
 })
 
 watch(() => appStore.isUserApproved, (approved) => {
@@ -176,6 +242,34 @@ async function handleInstall() {
     await appStore.install()
   } catch (e) {
     console.error('Install failed:', e)
+  }
+}
+
+async function handleCheckUpdate() {
+  try {
+    appStore.loading = true
+    const updateCheck = await TauriAPI.updater.check()
+    appStore.updateAvailable = updateCheck.hasUpdate
+    appStore.latestVersion = updateCheck.latestVersion
+    appStore.lastUpdateCheck = new Date().toLocaleString()
+  } catch (e) {
+    console.error('Check update failed:', e)
+  } finally {
+    appStore.loading = false
+  }
+}
+
+async function handleUpdate() {
+  try {
+    appStore.loading = true
+    await TauriAPI.updater.downloadAndInstall((progress) => {
+      console.log('Update progress:', progress)
+    })
+    await TauriAPI.updater.relaunch()
+  } catch (e) {
+    console.error('Update failed:', e)
+  } finally {
+    appStore.loading = false
   }
 }
 </script>
@@ -235,7 +329,7 @@ async function handleInstall() {
   display: grid;
   gap: 12px;
   padding: 16px;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
 @media (max-width: 980px) {
@@ -328,6 +422,13 @@ async function handleInstall() {
   opacity: 0.9;
 }
 
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
 .warning {
   display: flex;
   align-items: center;
@@ -338,6 +439,16 @@ async function handleInstall() {
   border: 1px solid rgba(245, 158, 11, 0.3);
   color: #fbbf24;
   font-size: 12px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .home__error {
@@ -356,5 +467,32 @@ async function handleInstall() {
   backdrop-filter: blur(10px);
   max-width: 400px;
   z-index: 1000;
+}
+
+.home__update {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(59, 130, 246, 0.9);
+  color: white;
+  font-size: 13px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  max-width: 400px;
+  z-index: 1000;
+}
+
+.update__title {
+  font-weight: 600;
+}
+
+.update__subtitle {
+  font-size: 11px;
+  opacity: 0.8;
 }
 </style>

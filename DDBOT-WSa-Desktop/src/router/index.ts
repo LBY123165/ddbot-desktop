@@ -4,7 +4,8 @@ import HomePage from '../pages/HomePage.vue'
 import SettingsPage from '../pages/SettingsPage.vue'
 import SetupWizard from '../pages/SetupWizard.vue'
 import ConfigEditor from '../pages/ConfigEditor.vue'
-import LogViewer from '../pages/LogViewer.vue'
+import GraphicalConfigEditor from '../pages/GraphicalConfigEditor.vue'
+import LogsPage from '../pages/LogsPage.vue'
 import TemplateCenter from '../pages/TemplateCenter.vue'
 
 const routes = [
@@ -17,13 +18,19 @@ const routes = [
   {
     path: '/config',
     name: 'Config',
-    component: ConfigEditor,
+    component: GraphicalConfigEditor,
     meta: { title: '配置编辑' },
+  },
+  {
+    path: '/config/text',
+    name: 'TextConfig',
+    component: ConfigEditor,
+    meta: { title: '文本配置编辑' },
   },
   {
     path: '/logs',
     name: 'Logs',
-    component: LogViewer,
+    component: LogsPage,
     meta: { title: '日志查看' },
   },
   {

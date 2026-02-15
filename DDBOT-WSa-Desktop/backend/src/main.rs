@@ -176,20 +176,23 @@ async fn get_subs_summary() -> Json<SubsSummaryResponse> {
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
     ) {
         Ok(conn) => {
-            let mut stmt = conn
-                .prepare("SELECT site, COUNT(*) as count FROM subs GROUP BY site")
-                .unwrap();
-            let rows = stmt
-                .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, u32>(1)?)))
-                .unwrap();
-
-            let mut map = HashMap::new();
-            for row in rows {
-                if let Ok((site, count)) = row {
-                    map.insert(site, count);
+            match conn.prepare("SELECT site, COUNT(*) as count FROM subs GROUP BY site") {
+                Ok(mut stmt) => {
+                    match stmt.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, u32>(1)?))) {
+                        Ok(rows) => {
+                            let mut map = HashMap::new();
+                            for row in rows {
+                                if let Ok((site, count)) = row {
+                                    map.insert(site, count);
+                                }
+                            }
+                            map
+                        }
+                        Err(_) => HashMap::new(),
+                    }
                 }
+                Err(_) => HashMap::new(),
             }
-            map
         }
         Err(_) => HashMap::new(),
     };
