@@ -227,7 +227,7 @@
                   <div class="config-item">
                     <label class="config-label">最小粉丝数</label>
                     <div class="config-control">
-                      <InputNumber v-model="config.acfun.minFollowerCap" :min="-1" />
+                      <Input v-model="config.acfun.minFollowerCap" type="number" />
                     </div>
                   </div>
                   <div class="config-item">
@@ -664,9 +664,10 @@ function addTwitterUrl() {
 }
 
 // 删除Twitter URL
-function removeTwitterUrl(index: number) {
+function removeTwitterUrl(index: number | string) {
+  const i = typeof index === 'string' ? parseInt(index, 10) : index
   if (config.value.twitter.baseUrl && config.value.twitter.baseUrl.length > 1) {
-    config.value.twitter.baseUrl.splice(index, 1)
+    config.value.twitter.baseUrl.splice(i, 1)
   }
 }
 

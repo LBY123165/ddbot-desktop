@@ -94,7 +94,9 @@ const invoke: any = async (cmd: string, args?: any) => {
 
       case 'read_logs_tail':
         try {
-          const logRes = await fetch(`http://localhost:3000/api/logs?lines=100`);
+          const linesLimit = args?.lines || 100;
+          const levelQuery = args?.level ? `&level=${args.level}` : '';
+          const logRes = await fetch(`http://localhost:3000/api/logs?lines=${linesLimit}${levelQuery}`);
           if (logRes.ok) {
             const data = await logRes.json();
             if (data.logs && data.logs.length > 0) {
@@ -213,7 +215,7 @@ export const TauriAPI = {
       ensureDdbotInstalled: (): Promise<void> => invoke('ensure_ddbot_installed'),
       readConfigFile: (filename: string): Promise<string> => invoke('read_config_file', { filename }),
       writeConfigFile: (filename: string, content: string): Promise<void> => invoke('write_config_file', { filename, content }),
-      readLogsTail: (lines: number): Promise<string[]> => invoke('read_logs_tail', { lines }),
+      readLogsTail: (lines: number, level?: string): Promise<string[]> => invoke('read_logs_tail', { lines, level }),
       listConfigBackups: (filename: string): Promise<string[]> => invoke('list_config_backups', { filename }),
       restoreConfigBackup: (backupName: string): Promise<void> => invoke('restore_config_backup', { backup_name: backupName }),
       installedVersionText: (): Promise<string> => invoke('installed_version_text'),

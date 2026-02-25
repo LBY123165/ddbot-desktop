@@ -122,7 +122,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { AlertCircle, Plus, RefreshCw, Clock, User } from 'lucide-vue-next'
-import { invoke } from '@tauri-apps/api/core'
+import { TauriAPI } from '../api/tauri'
 import Button from '../components/Button.vue'
 
 interface Template {
@@ -190,7 +190,7 @@ async function loadTemplates() {
   try {
     error.value = undefined
     // 从 template.yaml 读取模板
-    const content = await invoke<string>('read_config_file', { filename: 'template.yaml' })
+    const content = await TauriAPI.ddbot.readConfigFile('template.yaml')
     // 解析 YAML 内容 (简单处理，实际可能需要 js-yaml)
     // 这里暂时保持 mock 数据展示，但逻辑上已经对接了后端
     templates.value = [...mockTemplates]

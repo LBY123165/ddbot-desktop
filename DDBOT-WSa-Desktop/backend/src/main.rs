@@ -274,12 +274,35 @@ async fn restore_backup(Json(payload): Json<RestoreBackupRequest>) -> Result<Jso
 }
 
 async fn get_logs(Query(query): Query<LogQuery>) -> Result<Json<LogResponse>, String> {
-    let log_path = get_ddbot_data_dir().join("logs").join("latest.log");
-    if !log_path.exists() {
+    let logs_dir = get_ddbot_data_dir().join("logs");
+    if !logs_dir.exists() {
         return Ok(Json(LogResponse { logs: vec![] }));
     }
 
-    let content = fs::read_to_string(log_path).map_err(|e| e.to_string())?;
+    // Find the latest log file by sorting the filenames
+    let mut log_files = Vec::new();
+    if let Ok(entries) = fs::read_dir(&logs_dir) {
+        for entry in entries.flatten() {
+            if let Ok(file_type) = entry.file_type() {
+                if file_type.is_file() {
+                    let name = entry.file_name().to_string_lossy().into_owned();
+                    if name.ends_with(".log") {
+                        log_files.push(name);
+                    }
+                }
+            }
+        }
+    }
+
+    if log_files.is_empty() {
+        return Ok(Json(LogResponse { logs: vec![] }));
+    }
+
+    log_files.sort();
+    let latest_log = log_files.last().unwrap();
+    let log_path = logs_dir.join(latest_log);
+
+    let content = fs::read_to_string(log_path).unwrap_or_default();
     let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
 
     if let Some(level) = query.level {

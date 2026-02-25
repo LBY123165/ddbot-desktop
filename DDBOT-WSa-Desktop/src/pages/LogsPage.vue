@@ -16,6 +16,16 @@
             </Select>
           </div>
           <div class="toolbar-group">
+            <label class="toolbar-label">日志等级:</label>
+            <Select v-model="selectedLevel" @change="loadLogs">
+              <Option value="all">全部</Option>
+              <Option value="debug">DEBUG</Option>
+              <Option value="info">INFO</Option>
+              <Option value="warn">WARN</Option>
+              <Option value="error">ERROR</Option>
+            </Select>
+          </div>
+          <div class="toolbar-group">
             <label class="toolbar-label">显示行数:</label>
             <InputNumber v-model="logLines" :min="50" :max="1000" :step="50" @change="loadLogs" />
           </div>
@@ -63,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { RefreshCw, Trash2, AlertCircle, Eye } from 'lucide-vue-next'
 import Button from '../components/Button.vue'
 import Select from '../components/Select.vue'
@@ -77,6 +87,7 @@ const loading = ref(false)
 const refreshing = ref(false)
 const error = ref<string | undefined>()
 const selectedSource = ref<'ddbot' | 'app' | 'all'>('ddbot')
+const selectedLevel = ref('all')
 const logLines = ref(200)
 const following = ref(true)
 const lastUpdated = ref<string | undefined>()
@@ -94,7 +105,8 @@ async function loadLogs() {
     error.value = undefined
     
     // 使用 readLogsTail 获取指定行数的日志
-    const logContent = await TauriAPI.ddbot.readLogsTail(logLines.value)
+    const levelParam = selectedLevel.value === 'all' ? undefined : selectedLevel.value;
+    const logContent = await TauriAPI.ddbot.readLogsTail(logLines.value, levelParam)
     logs.value = logContent
     
     lastUpdated.value = new Date().toLocaleTimeString()
@@ -143,11 +155,11 @@ function toggleFollow() {
 
 // 滚动到底部
 function scrollToBottom() {
-  setTimeout(() => {
+  nextTick(() => {
     if (logsContainer.value) {
       logsContainer.value.scrollTop = logsContainer.value.scrollHeight
     }
-  }, 100)
+  })
 }
 
 // 自动刷新日志
