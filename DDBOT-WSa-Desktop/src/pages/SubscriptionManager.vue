@@ -78,10 +78,8 @@
         <div class="form-group">
           <label>订阅类型</label>
           <select v-model="newSub.type" class="input">
-            <option value="dynamic">动态 (dynamic)</option>
+            <option value="news">动态/文章/视频/博文 (news)</option>
             <option value="live">直播 (live)</option>
-            <option value="post">文章/博文 (post)</option>
-            <option value="video">视频 (video)</option>
           </select>
         </div>
         
@@ -115,7 +113,7 @@ const showAddModal = ref(false)
 const newSub = ref<SubInfo>({
   id: '',
   site: 'bilibili',
-  type: 'dynamic',
+  type: 'news',
   groupCode: 0
 })
 
