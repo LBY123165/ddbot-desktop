@@ -1,24 +1,18 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-const host = process.env.TAURI_DEV_HOST;
+// Standard Vue+Vite project config
 
 export default defineConfig({
   plugins: [vue()],
   clearScreen: false,
   server: {
-    port: 3000,
-    strictPort: true,
     host: true,
-    hmr: host
-      ? {
-        protocol: "ws",
-        host,
-        port: 1421,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true
       }
-      : undefined,
-    watch: {
-      ignored: ["**/src-tauri/**"],
-    },
+    }
   },
 })

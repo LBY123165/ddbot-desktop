@@ -95,7 +95,7 @@ export const useAppStore = defineStore('app', () => {
       let processStartTime: number | undefined = undefined;
 
       try {
-        const res = await fetch('http://localhost:3000/api/process/status');
+        const res = await fetch('/api/process/status');
         if (res.ok) {
           const data = await res.json();
           processRunning = data.running;
@@ -182,7 +182,7 @@ export const useAppStore = defineStore('app', () => {
     isUserApproved.value = true
   }
   // 后端 API 地址
-  const BACKEND_URL = 'http://localhost:3000/api'
+  const BACKEND_URL = '/api'
 
   async function install() {
     try {

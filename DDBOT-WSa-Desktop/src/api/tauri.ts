@@ -52,7 +52,7 @@ const invoke: any = async (cmd: string, args?: any) => {
       case 'read_config_file':
         const filename = args?.filename || 'application.yaml';
         try {
-          const cfgRes = await fetch(`http://localhost:3000/api/config?filename=${filename}`);
+          const cfgRes = await fetch(`/api/config?filename=${filename}`);
           if (cfgRes.ok) {
             const data = await cfgRes.json();
             return data.content;
@@ -72,7 +72,7 @@ const invoke: any = async (cmd: string, args?: any) => {
           // Wait, if it's already string, we just send it.
           const textContent = typeof contentObj === 'string' ? contentObj : JSON.stringify(contentObj, null, 2);
 
-          await fetch(`http://localhost:3000/api/config`, {
+          await fetch(`/api/config`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ filename: writeFilename, content: textContent })
@@ -96,7 +96,7 @@ const invoke: any = async (cmd: string, args?: any) => {
         try {
           const linesLimit = args?.lines || 100;
           const levelQuery = args?.level ? `&level=${args.level}` : '';
-          const logRes = await fetch(`http://localhost:3000/api/logs?lines=${linesLimit}${levelQuery}`);
+          const logRes = await fetch(`/api/logs?lines=${linesLimit}${levelQuery}`);
           if (logRes.ok) {
             const data = await logRes.json();
             if (data.logs && data.logs.length > 0) {

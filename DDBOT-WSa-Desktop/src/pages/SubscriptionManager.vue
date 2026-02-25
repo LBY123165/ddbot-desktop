@@ -29,6 +29,7 @@
               <th>群组 (Group Code)</th>
               <th>站点 (Site)</th>
               <th>账号 ID</th>
+              <th>账号名称</th>
               <th>订阅类型 (Type)</th>
               <th>操作</th>
             </tr>
@@ -38,6 +39,7 @@
               <td class="mono">{{ sub.groupCode }}</td>
               <td>{{ sub.site }}</td>
               <td class="mono font-semibold">{{ sub.id }}</td>
+              <td>{{ sub.name || '-' }}</td>
               <td>
                 <span class="type-badge">{{ sub.type }}</span>
               </td>
@@ -99,6 +101,7 @@ import Button from '../components/Button.vue'
 
 interface SubInfo {
   id: any
+  name?: string
   type: string
   site: string
   groupCode: number

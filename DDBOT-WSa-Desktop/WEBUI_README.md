@@ -34,13 +34,33 @@ npm install
 npm run dev
 ```
 
-### 生产构建
+### 生产部署 (发布)
 
+完整的 WebUI 是由“前端静态构建” + “Node.js 守护进程”两部分组成的，在生产环境中，请按照以下步骤启动：
+
+1. **编译打包前端静态网页：**
 ```bash
-# 构建前端静态文件
+# 在项目根目录下执行
 npm run build
 ```
-构建完成后，`dist` 目录下的静态文件可以部署在任意 HTTP 服务器（如 Nginx, Caddy，或直接托管）。
+
+2. **启动 Node.js 服务端服务：**
+```bash
+cd backend-js
+# 安装后端所需依赖 (首次运行需要)
+npm install
+# 直接启动
+node index.js
+```
+
+> **推荐方案**：使用 `pm2` 来守护后台进程，确保 WebUI 就算关掉终端也能持久运行并在开机自启：
+```bash
+npm install -g pm2
+cd backend-js
+pm2 start index.js --name "ddbot-webui"
+```
+
+启动后，无论是内网还是公网，直接访问 `http://服务器IP:3000` 即可全栈使用。
 
 ## 目录结构
 
