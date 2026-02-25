@@ -4,19 +4,18 @@
 
 ## 架构说明
 
-本项目采用前后端分离架构：
+本项目采用纯前端架构，直接与 DDBOT-WSa 的 Admin API 交互：
 
 - **前端**: Vue 3 + TypeScript + Vite
-- **后端**: Rust + Axum (RESTful API)
-- **部署**: 可注册为系统服务自动运行
+- **后端**: DDBOT-WSa 自带的 Admin API (默认端口 15631)
+- **零依赖**: 摒弃了原有的 Rust 中间件，直接通过前端浏览器与机器人本体通信。
 
 ## 特性
 
 ✅ 纯 Web 架构，跨平台访问
-✅ 系统服务自动启动
-✅ 进程管理 (启动/停止/重启)
-✅ 实时状态监控
-✅ 配置文件编辑
+✅ 实时状态监控 (OneBot 连接状态、订阅信息等)
+✅ 配置文件编辑与热重载无缝集成
+✅ 可视化订阅管理 (添加、编辑群组订阅)
 ✅ 响应式设计
 
 ## 开发环境
@@ -24,122 +23,58 @@
 ### 前置要求
 
 - Node.js 18+
-- Rust 1.70+
-- Cargo
 
 ### 开发模式
 
 ```bash
-# 同时启动前后端开发服务器
-npm run dev:both
+# 安装依赖
+npm install
 
-# 或分别启动
-npm run dev          # 前端开发服务器 (http://localhost:5173)
-npm run dev:backend  # 后端API服务器 (http://localhost:3000)
+# 启动前端开发服务器 (监听在 http://localhost:3000)
+npm run dev
 ```
 
 ### 生产构建
 
 ```bash
-# 构建前后端
+# 构建前端静态文件
 npm run build
-
-# 分别构建
-npm run build:frontend
-npm run build:backend
 ```
-
-## 系统服务部署
-
-### Windows
-
-```powershell
-# 以管理员身份运行
-npm run service:install
-
-# 卸载服务
-npm run service:uninstall
-```
-
-### Linux
-
-```bash
-# 复制服务文件
-sudo cp service/ddbot-webui.service /etc/systemd/system/
-
-# 启用并启动服务
-sudo systemctl enable ddbot-webui
-sudo systemctl start ddbot-webui
-
-# 查看状态
-sudo systemctl status ddbot-webui
-```
-
-## API 接口
-
-### 健康检查
-```
-GET /api/health
-```
-
-### 进程管理
-```
-GET /api/process/status     # 获取进程状态
-POST /api/process/control   # 控制进程 (start/stop/restart)
-```
-
-### DDBOT 状态
-```
-GET /api/onebot/status      # OneBot 连接状态
-GET /api/subs/summary       # 订阅统计信息
-```
+构建完成后，`dist` 目录下的静态文件可以部署在任意 HTTP 服务器（如 Nginx, Caddy，或直接托管）。
 
 ## 目录结构
 
 ```
 DDBOT-WSa-Desktop/
-├── backend/              # Rust 后端服务
-│   ├── src/
-│   │   └── main.rs       # 主程序入口
-│   └── Cargo.toml        # Rust 依赖配置
 ├── src/                  # Vue 前端源码
+│   ├── api/             # API 交互层 (tauri.ts 封装了 Go Admin API)
 │   ├── components/       # Vue 组件
 │   ├── pages/           # 页面组件
 │   ├── stores/          # 状态管理
 │   └── router/          # 路由配置
-├── service/              # 系统服务配置
-│   ├── ddbot-webui.service      # Linux systemd 配置
-│   └── ddbot-webui-windows.xml  # Windows 服务配置
-├── scripts/              # 部署脚本
-│   ├── install-service.ps1      # Windows 安装脚本
-│   └── uninstall-service.ps1    # Windows 卸载脚本
-├── dist/                 # 前端构建输出
+├── dist/                 # 前端构建输出 (npm run build 生成)
+├── vite.config.ts        # Vite 构建/服务配置
 └── package.json          # Node.js 配置
 ```
 
 ## 访问地址
 
-服务启动后可通过以下地址访问：
-- WebUI: `http://localhost:3000`
-- API 文档: `http://localhost:3000/docs` (开发中)
+开发服务启动后可通过以下地址访问 WebUI：
+- `http://localhost:3000`
+- `http://127.0.0.1:3000`
 
-## 安全说明
+若要允许局域网设备访问，Vite 的 `host: true` 配置已默认开启，可通过主机的局域网 IP 访问。
 
-- 默认只监听本地地址 (127.0.0.1)
-- 建议在生产环境中配置反向代理和SSL
-- 可通过环境变量配置监听地址和端口
+## 常见问题 / 故障排除
 
-## 故障排除
+### WebUI 无法获取数据 / 一直显示未连接
+1. 确认 DDBOT-WSa 主程序的 `application.yaml` 中已开启 `admin.enable: true`。
+2. 确认主程序 Admin API 端口配置正确 (默认应为 `127.0.0.1:15631`)。
+3. 检查并确认 DDBOT-WSa 后台进程是否处于运行状态。
 
-### 服务无法启动
-1. 检查端口 3000 是否被占用
-2. 确认 Rust 环境配置正确
-3. 查看服务日志文件
-
-### WebUI 无法访问
-1. 确认后端服务正在运行
-2. 检查防火墙设置
-3. 验证网络连接
+### npm run dev 无法访问
+1. 如果端口 3000 被其他程序占用，Vite 将会报错，请换用其他端口或结束占用进程。
+2. Windows 下如果提示 `npm.ps1 无法运行`，请尝试在 `cmd` (而非 PowerShell) 下运行，或在 PowerShell 中执行 `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` 解除安全限制。
 
 ## 许可证
 

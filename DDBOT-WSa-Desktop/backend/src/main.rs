@@ -15,8 +15,13 @@ use std::process::Stdio;
 use std::sync::Arc;
 use tokio::process::Command;
 use tokio::sync::Mutex;
-use tracing::{error, info};
+use tracing::info;
 use tower_http::cors::{Any, CorsLayer};
+use flate2::read::GzDecoder;
+use regex::Regex;
+use std::io::{Cursor, Read};
+use tar::Archive;
+use zip::ZipArchive;
 
 // 全局状态管理
 lazy_static::lazy_static! {
@@ -102,6 +107,7 @@ struct RestoreBackupRequest {
 #[derive(Deserialize)]
 struct LogQuery {
     lines: Option<usize>,
+    level: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -274,34 +280,190 @@ async fn get_logs(Query(query): Query<LogQuery>) -> Result<Json<LogResponse>, St
     }
 
     let content = fs::read_to_string(log_path).map_err(|e| e.to_string())?;
-    let lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+    let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+
+    if let Some(level) = query.level {
+        let level_upper = level.to_uppercase();
+        if level_upper != "ALL" && !level_upper.is_empty() {
+            lines.retain(|s| s.contains(&level_upper));
+        }
+    }
+
     let limit = query.lines.unwrap_or(100);
     let start = if lines.len() > limit { lines.len() - limit } else { 0 };
     Ok(Json(LogResponse { logs: lines[start..].to_vec() }))
 }
 
-async fn install_ddbot() -> Result<Json<serde_json::Value>, String> {
-    info!("开始安装 DDBOT");
-    let workdir = get_workdir();
-    let bin_dir = workdir.join("bin");
-    fs::create_dir_all(&bin_dir).map_err(|e| e.to_string())?;
-    fs::create_dir_all(get_ddbot_data_dir()).map_err(|e| e.to_string())?;
+// Github Release API structs
+#[derive(Debug, Deserialize)]
+struct GithubRelease {
+    tag_name: String,
+    assets: Vec<GithubAsset>,
+}
 
-    let exe_path = bin_dir.join("ddbot-wsa.exe");
+#[derive(Debug, Deserialize)]
+struct GithubAsset {
+    name: String,
+    browser_download_url: String,
+}
 
-    // 检查是否存在本地构建的可执行文件
-    let local_build_path = workdir.join("target").join("debug").join("ddbot-wsa.exe");
-    if local_build_path.exists() {
-        info!("找到本地构建的可执行文件: {:?}", local_build_path);
-        fs::copy(&local_build_path, &exe_path).map_err(|e| e.to_string())?;
-        info!("已复制到: {:?}", exe_path);
-    } else {
-        // 如果不存在本地构建的可执行文件，创建一个占位符
-        fs::write(&exe_path, "mock binary content").map_err(|e| e.to_string())?;
-        info!("创建了占位符可执行文件: {:?}", exe_path);
+fn looks_like_ddbot_executable(path: &Path) -> bool {
+    if !path.is_file() {
+        return false;
     }
+    let name = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    if cfg!(windows) {
+        name.ends_with("ddbot.exe") || name.ends_with("ddbot-wsa.exe")
+    } else {
+        name == "ddbot" || name == "ddbot-wsa"
+    }
+}
 
-    Ok(Json(serde_json::json!({ "success": true, "message": "安装成功" })))
+fn find_ddbot_executable_in_dir(dir: &Path) -> Option<PathBuf> {
+    if let Ok(rd) = fs::read_dir(dir) {
+        for e in rd.flatten() {
+            let p = e.path();
+            if looks_like_ddbot_executable(&p) {
+                return Some(p);
+            }
+        }
+    }
+    None
+}
+
+fn target_keywords() -> (String, Vec<String>) {
+    let os = std::env::consts::OS;
+    let arch = std::env::consts::ARCH;
+
+    let os_kw = match os {
+        "windows" => "windows",
+        "macos" => "darwin",
+        "linux" => "linux",
+        other => other,
+    };
+
+    let arch_kws: Vec<String> = match arch {
+        "x86_64" => vec!["amd64".to_string()],
+        "x86" | "i686" => vec!["386".to_string()],
+        "aarch64" => vec!["arm64".to_string(), "arm".to_string()],
+        other => vec![other.to_string()],
+    };
+
+    (os_kw.to_string(), arch_kws)
+}
+
+fn pick_asset<'a>(assets: &'a [GithubAsset], os_kw: &str, arch_kws: &[String]) -> Option<&'a GithubAsset> {
+    for arch_kw in arch_kws {
+        let pattern = format!(r"(?i)^DDBOT-WSa-.*-{}-{}\\.(zip|tar\\.gz)$", regex::escape(os_kw), regex::escape(arch_kw));
+        if let Ok(re) = Regex::new(&pattern) {
+            if let Some(asset) = assets.iter().find(|a| re.is_match(&a.name)) {
+                return Some(asset);
+            }
+        }
+    }
+    None
+}
+
+async fn download_file(url: &str) -> Result<Vec<u8>, String> {
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(url)
+        .header("User-Agent", "DDBOT-WSa-Desktop-Backend")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .error_for_status()
+        .map_err(|e| e.to_string())?;
+    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    Ok(bytes.to_vec())
+}
+
+fn extract_archive(name: &str, bytes: &[u8], out_dir: &Path) -> Result<PathBuf, String> {
+    let target_name = if cfg!(windows) { "ddbot.exe" } else { "ddbot" };
+    let out_file = out_dir.join(target_name);
+    
+    if name.to_lowercase().ends_with(".zip") {
+        let mut zip = ZipArchive::new(Cursor::new(bytes)).map_err(|e| e.to_string())?;
+        for i in 0..zip.len() {
+            let mut file = zip.by_index(i).map_err(|e| e.to_string())?;
+            let fname = file.name().to_string();
+            if fname.ends_with("/") { continue; }
+            let lower = fname.to_lowercase();
+            if lower.ends_with("ddbot.exe") || lower.ends_with("ddbot") {
+                let mut buf = Vec::new();
+                file.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+                fs::write(&out_file, buf).map_err(|e| e.to_string())?;
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let mut perm = fs::metadata(&out_file).unwrap().permissions();
+                    perm.set_mode(0o755);
+                    let _ = fs::set_permissions(&out_file, perm);
+                }
+                return Ok(out_file);
+            }
+        }
+        Err("Executable not found in zip".to_string())
+    } else if name.to_lowercase().ends_with(".tar.gz") {
+        let gz = GzDecoder::new(Cursor::new(bytes));
+        let mut ar = Archive::new(gz);
+        for entry in ar.entries().map_err(|e| e.to_string())? {
+            let mut entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path().map_err(|e| e.to_string())?.to_string_lossy().to_string();
+            let lower = path.to_lowercase();
+            if lower.ends_with("ddbot") || lower.ends_with("ddbot.exe") {
+                let mut buf = Vec::new();
+                entry.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+                fs::write(&out_file, buf).map_err(|e| e.to_string())?;
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let mut perm = fs::metadata(&out_file).unwrap().permissions();
+                    perm.set_mode(0o755);
+                    let _ = fs::set_permissions(&out_file, perm);
+                }
+                return Ok(out_file);
+            }
+        }
+        Err("Executable not found in tar.gz".to_string())
+    } else {
+        Err(format!("Unsupported archive: {}", name))
+    }
+}
+
+async fn install_ddbot() -> Result<Json<serde_json::Value>, String> {
+    info!("Starting DDBOT download/installation");
+    let data_dir = get_ddbot_data_dir();
+    fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
+
+    let url = "https://api.github.com/repos/cnxysoft/DDBOT-WSa/releases/latest";
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(url)
+        .header("User-Agent", "DDBOT-WSa-Desktop-Backend")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .error_for_status()
+        .map_err(|e| e.to_string())?;
+    
+    let release = resp.json::<GithubRelease>().await.map_err(|e| e.to_string())?;
+    let (os_kw, arch_kws) = target_keywords();
+    
+    let asset = pick_asset(&release.assets, &os_kw, &arch_kws)
+        .ok_or_else(|| format!("No matching release asset found for {}-{:?}", os_kw, arch_kws))?;
+
+    info!("Downloading {}", asset.browser_download_url);
+    let bytes = download_file(&asset.browser_download_url).await?;
+    
+    info!("Extracting...");
+    let out_file = extract_archive(&asset.name, &bytes, &data_dir)?;
+
+    Ok(Json(serde_json::json!({ "success": true, "message": format!("Installed to {:?}", out_file) })))
 }
 
 #[derive(Serialize)]
@@ -319,13 +481,14 @@ async fn control_process(Json(payload): Json<ProcessControlRequest>) -> (StatusC
                     Json(serde_json::json!({ "error": "进程已在运行" }))
                 );
             }
-            let exe_path = get_ddbot_data_dir().join("DDBOT.exe");
-            if !exe_path.exists() {
+            let opt_exe = find_ddbot_executable_in_dir(&get_ddbot_data_dir());
+            if opt_exe.is_none() {
                 return (
                     StatusCode::NOT_FOUND,
-                    Json(serde_json::json!({ "error": format!("可执行文件不存在: {:?}", exe_path) }))
+                    Json(serde_json::json!({ "error": "ddbot executable not found in data directory. Please install it first." }))
                 );
             }
+            let exe_path = opt_exe.unwrap();
             let child = Command::new(exe_path)
                 .current_dir(get_ddbot_data_dir())
                 .stdout(Stdio::null())
@@ -369,13 +532,14 @@ async fn control_process(Json(payload): Json<ProcessControlRequest>) -> (StatusC
             if let Some(mut child) = guard.take() {
                 let _ = child.kill().await;
             }
-            let exe_path = get_ddbot_data_dir().join("DDBOT.exe");
-            if !exe_path.exists() {
+            let opt_exe = find_ddbot_executable_in_dir(&get_ddbot_data_dir());
+            if opt_exe.is_none() {
                 return (
                     StatusCode::NOT_FOUND,
-                    Json(serde_json::json!({ "error": format!("可执行文件不存在: {:?}", exe_path) }))
+                    Json(serde_json::json!({ "error": "ddbot executable not found in data directory. Please install it first." }))
                 );
             }
+            let exe_path = opt_exe.unwrap();
             let child = Command::new(exe_path)
                 .current_dir(get_ddbot_data_dir())
                 .stdout(Stdio::null())

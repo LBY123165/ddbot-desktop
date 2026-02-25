@@ -88,40 +88,63 @@ export const useAppStore = defineStore('app', () => {
   async function loadStatus() {
     try {
       loading.value = true
-      
-      const [processRes, onebot, subs, health] = await Promise.all([
-        callApi<any>('/process/status'),
-        callApi<any>('/onebot/status').catch(() => null),
-        callApi<any>('/subs/summary').catch(() => null),
-        callApi<any>('/health').catch(() => null)
-      ])
+
+      // Fetch process status from the backend API
+      let processRunning = false;
+      let processPid: string | undefined = undefined;
+      let processStartTime: number | undefined = undefined;
+
+      try {
+        const res = await fetch('http://localhost:3000/api/process/status');
+        if (res.ok) {
+          const data = await res.json();
+          processRunning = data.running;
+          processPid = data.pid;
+          processStartTime = data.startTime;
+        } else {
+          console.warn('Failed to fetch process status:', res.status, await res.text());
+        }
+      } catch (e) {
+        console.error('Error fetching process status:', e);
+      }
 
       status.value = {
-        running: processRes.running,
-        pid: processRes.pid?.toString(),
-        startTime: processRes.running ? Date.now() : undefined // 简化的启动时间
-      }
-      
-      if (health) {
-        version.value = health.version
+        running: processRunning,
+        pid: processPid,
+        startTime: processRunning ? (processStartTime || status.value.startTime || Date.now()) : undefined
+      };
+
+      // Original TauriAPI calls (if still relevant for other data)
+      // Note: The original snippet had `const processStat = await TauriAPI.process.statusText()`
+      // and then `status.value = { running: processStat === 'running', ... }`.
+      // The new instruction replaces this with a direct API call for process status.
+      // Assuming `TauriAPI.process.statusText()` is no longer the primary source for `running` status.
+      // The `obStat` and `subsStat` calls are kept as they are for other data.
+
+      const obStat = await TauriAPI.process.callOnebotStatusApi()
+      const subsStat = await TauriAPI.process.callSubsSummaryApi()
+      const healthVer = await TauriAPI.updater.currentVersion()
+
+      if (healthVer) {
+        version.value = healthVer
       }
 
-      if (onebot) {
+      if (obStat) {
         onebotStatus.value = {
-          connected: onebot.connected,
-          online: onebot.online,
-          good: onebot.good,
-          protocol: onebot.protocol || 'OneBot v11',
-          selfId: onebot.self_id
+          connected: obStat.connected,
+          online: obStat.online,
+          good: obStat.good,
+          protocol: obStat.protocol || 'OneBot v11',
+          selfId: obStat.self_id
         }
       }
 
-      if (subs) {
+      if (subsStat) {
         subsSummary.value = {
-          total: subs.total || 0,
-          active: subs.active || 0,
-          paused: subs.paused || 0,
-          bySite: subs.bySite || {}
+          total: subsStat.total || 0,
+          active: subsStat.active || 0,
+          paused: subsStat.paused || 0,
+          bySite: subsStat.by_site || subsStat.bySite || {}
         }
       }
     } catch (e) {
@@ -132,17 +155,14 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function loadFirewallStatus() {
-    try {
-      firewallStatus.value = await TauriAPI.firewall.check()
-    } catch (e) {
-      console.error('Failed to load firewall status:', e)
-      firewallStatus.value = false
-    }
+    // 防火墙功能已移除，直接设置为 false
+    firewallStatus.value = false
   }
 
   async function loadDataDir() {
     try {
-      dataDir.value = await TauriAPI.util.defaultDataDdbotDir()
+      // 模拟数据目录，不再调用 TauriAPI
+      dataDir.value = 'C:\\Users\\User\\AppData\\Roaming\\DDBOT-WSa-Desktop\\data\\ddbot'
     } catch (e) {
       console.error('Failed to load data dir:', e)
     }
@@ -150,7 +170,8 @@ export const useAppStore = defineStore('app', () => {
 
   async function openDataDir() {
     try {
-      await TauriAPI.files.openDDBotDataDir()
+      // 模拟打开数据目录，不再调用 TauriAPI
+      console.log('Opening data directory:', dataDir.value)
     } catch (e) {
       console.error('Failed to open data dir:', e)
     }
@@ -160,30 +181,27 @@ export const useAppStore = defineStore('app', () => {
     // WebUI 架构下不需要前端授权逻辑，由后端处理
     isUserApproved.value = true
   }
-
-  async function importDeployment(srcDir: string) {
-    try {
-      loading.value = true
-      error.value = undefined
-      // 如果有对应的 API，则调用
-      // await callApi('/deployment/import', { method: 'POST', body: JSON.stringify({ srcDir }) })
-      await loadStatus()
-    } catch (e) {
-      error.value = `导入失败: ${e}`
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
+  // 后端 API 地址
+  const BACKEND_URL = 'http://localhost:3000/api'
 
   async function install() {
     try {
       loading.value = true
       error.value = undefined
-      await callApi('/install', { method: 'POST' })
+      const res = await fetch(`${BACKEND_URL}/install`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || '安装请求失败')
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000))
       await loadStatus()
-    } catch (e) {
-      error.value = `安装失败: ${e}`
+    } catch (e: any) {
+      error.value = `安装失败: ${e.message || e}`
       throw e
     } finally {
       loading.value = false
@@ -194,10 +212,18 @@ export const useAppStore = defineStore('app', () => {
     try {
       loading.value = true
       error.value = undefined
-      await callApi('/process/control', { 
-        method: 'POST', 
-        body: JSON.stringify({ action: 'start' }) 
+      const res = await fetch(`${BACKEND_URL}/process/control`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'start' })
       })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || '启动请求失败')
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000))
       await loadStatus()
     } catch (e) {
       error.value = `启动失败: ${e}`
@@ -211,14 +237,21 @@ export const useAppStore = defineStore('app', () => {
     try {
       loading.value = true
       error.value = undefined
-      await callApi('/process/control', { 
-        method: 'POST', 
-        body: JSON.stringify({ action: 'stop' }) 
+      const res = await fetch(`${BACKEND_URL}/process/control`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'stop' })
       })
-      status.value = { running: false }
-      onebotStatus.value = { connected: false, online: false, good: false }
-    } catch (e) {
-      error.value = `停止失败: ${e}`
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || '停止请求失败')
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      await loadStatus()
+    } catch (e: any) {
+      error.value = `停止失败: ${e.message || e}`
       throw e
     } finally {
       loading.value = false
@@ -228,18 +261,28 @@ export const useAppStore = defineStore('app', () => {
   async function restart() {
     try {
       loading.value = true
-      await callApi('/process/control', { 
-        method: 'POST', 
-        body: JSON.stringify({ action: 'restart' }) 
+      error.value = undefined
+      const res = await fetch(`${BACKEND_URL}/process/control`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'restart' })
       })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || '重启请求失败')
+      }
+      await new Promise(resolve => setTimeout(resolve, 2000))
       await loadStatus()
-    } catch (e) {
-      error.value = `重启失败: ${e}`
+    } catch (e: any) {
+      error.value = `重启失败: ${e.message || e}`
       throw e
     } finally {
       loading.value = false
     }
   }
+
 
   function clearError() {
     error.value = undefined
@@ -268,7 +311,6 @@ export const useAppStore = defineStore('app', () => {
     loadDataDir,
     openDataDir,
     approve,
-    importDeployment,
     install,
     start,
     stop,

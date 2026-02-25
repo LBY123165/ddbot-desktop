@@ -10,6 +10,7 @@
           <Button :icon="History" variant="secondary" @click="showBackups = !showBackups">备份历史</Button>
           <Button :icon="Save" :loading="saving" @click="saveConfig">保存配置</Button>
           <Button :icon="RefreshCw" @click="loadConfig">重新加载</Button>
+          <Button variant="secondary" @click="switchToGraphicalEditor">简单模式</Button>
         </div>
       </div>
 
@@ -80,9 +81,10 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { Save, RefreshCw, AlertCircle, History, RotateCcw } from 'lucide-vue-next'
 import Button from '../components/Button.vue'
+import { TauriAPI } from '../api/tauri'
+import { useRouter } from 'vue-router'
 
-const API_BASE = 'http://localhost:3000/api'
-
+const router = useRouter()
 const configContent = ref('')
 const selectedFile = ref('application.yaml')
 const saving = ref(false)
@@ -110,11 +112,10 @@ const placeholderText = computed(() => {
 async function loadConfig() {
   try {
     error.value = undefined
-    const response = await fetch(`${API_BASE}/config?filename=${selectedFile.value}`)
-    if (!response.ok) throw new Error('无法加载配置')
-    const data = await response.json()
-    configContent.value = data.content
-    originalContent.value = data.content
+    const content = await TauriAPI.ddbot.readConfigFile(selectedFile.value)
+    if (content === null) throw new Error('无法加载配置')
+    configContent.value = content
+    originalContent.value = content
     hasUnsavedChanges.value = false
     await loadBackups()
   } catch (e) {
@@ -126,10 +127,7 @@ async function loadConfig() {
 async function loadBackups() {
   try {
     loadingBackups.value = true
-    const response = await fetch(`${API_BASE}/config/backups?filename=${selectedFile.value}`)
-    if (!response.ok) throw new Error('无法加载备份')
-    const data = await response.json()
-    backups.value = data.backups
+    backups.value = await TauriAPI.ddbot.listConfigBackups(selectedFile.value)
   } catch (e) {
     console.error('Failed to load backups:', e)
   } finally {
@@ -141,15 +139,7 @@ async function saveConfig() {
   try {
     saving.value = true
     error.value = undefined
-    const response = await fetch(`${API_BASE}/config`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filename: selectedFile.value,
-        content: configContent.value
-      })
-    })
-    if (!response.ok) throw new Error('保存失败')
+    await TauriAPI.ddbot.writeConfigFile(selectedFile.value, configContent.value)
     originalContent.value = configContent.value
     hasUnsavedChanges.value = false
     lastSaved.value = new Date().toLocaleTimeString()
@@ -166,12 +156,7 @@ async function restoreBackup(backupName: string) {
     return
   }
   try {
-    const response = await fetch(`${API_BASE}/config/restore`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ backup_name: backupName })
-    })
-    if (!response.ok) throw new Error('恢复失败')
+    await TauriAPI.ddbot.restoreConfigBackup(backupName)
     await loadConfig()
     showBackups.value = false
   } catch (e) {
@@ -197,6 +182,10 @@ function clearError() {
 
 async function loadSelectedFile() {
   await loadConfig()
+}
+
+function switchToGraphicalEditor() {
+  router.push('/config')
 }
 
 onMounted(() => {

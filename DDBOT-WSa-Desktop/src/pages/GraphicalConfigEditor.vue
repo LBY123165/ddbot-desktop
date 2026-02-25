@@ -225,6 +225,12 @@
                     </div>
                   </div>
                   <div class="config-item">
+                    <label class="config-label">最小粉丝数</label>
+                    <div class="config-control">
+                      <InputNumber v-model="config.acfun.minFollowerCap" :min="-1" />
+                    </div>
+                  </div>
+                  <div class="config-item">
                     <label class="config-label">密码</label>
                     <div class="config-control">
                       <Input v-model="config.acfun.password" type="password" />
@@ -502,8 +508,10 @@ import Option from '../components/Option.vue'
 import InputNumber from '../components/InputNumber.vue'
 import { TauriAPI } from '../api/tauri'
 import { useRouter } from 'vue-router'
+import { parseDocument } from 'yaml'
 
 const router = useRouter()
+let yamlDoc: any = null
 
 // 状态管理
 const config = ref<any>({
@@ -630,7 +638,7 @@ const showWsToken = ref(false)
 const showAdminToken = ref(false)
 
 // 展开/折叠状态
-const sections = ref({
+const sections = ref<{ [key: string]: boolean }>({
   bot: true,
   bilibili: true,
   otherPlatforms: false,
@@ -639,7 +647,7 @@ const sections = ref({
 
 // 切换到文本编辑器
 function switchToTextEditor() {
-  router.push('/config')
+  router.push('/config/text')
 }
 
 // 切换配置节
@@ -669,7 +677,14 @@ async function loadConfig() {
     error.value = undefined
     
     const content = await TauriAPI.ddbot.readConfigFile('application.yaml')
-    config.value = parseYAML(content)
+    if (typeof content === 'string' && content.trim()) {
+      yamlDoc = parseDocument(content)
+      const parsed = yamlDoc.toJSON() || {}
+      config.value = deepMerge(config.value, parsed)
+    } else {
+      yamlDoc = parseDocument('')
+    }
+    
     originalConfig.value = JSON.parse(JSON.stringify(config.value))
     hasUnsavedChanges.value = false
     
@@ -688,7 +703,20 @@ async function saveConfig() {
     saving.value = true
     error.value = undefined
     
-    const content = generateYAML(config.value)
+    function updateDocPaths(doc: any, obj: any, path: string[] = []) {
+      for (const key in obj) {
+        if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+          updateDocPaths(doc, obj[key], [...path, key])
+        } else {
+          doc.setIn([...path, key], obj[key])
+        }
+      }
+    }
+    
+    if (!yamlDoc) yamlDoc = parseDocument('')
+    updateDocPaths(yamlDoc, config.value)
+    
+    const content = String(yamlDoc)
     await TauriAPI.ddbot.writeConfigFile('application.yaml', content)
     
     originalConfig.value = JSON.parse(JSON.stringify(config.value))
@@ -743,221 +771,24 @@ function clearError() {
   error.value = undefined
 }
 
-// 解析YAML
-function parseYAML(content: string): any {
-  // 简单的YAML解析，实际应用中可能需要更复杂的解析
-  const lines = content.split('\n')
-  const result: any = {}
-  let currentObj: any = result
-  const stack: any[] = []
+// 深度合并对象
+function deepMerge(target: any, source: any): any {
+  const result = { ...target }
   
-  for (const line of lines) {
-    const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith('#')) continue
-    
-    const indent = line.length - trimmed.length
-    const keyMatch = trimmed.match(/^([^:]+):\s*(.*)$/)
-    if (keyMatch) {
-      const key = keyMatch[1]
-      const value = keyMatch[2]
-      
-      // 调整对象层级
-      while (stack.length > 0 && stack[stack.length - 1].indent >= indent) {
-        stack.pop()
-        currentObj = stack.length > 0 ? stack[stack.length - 1].obj : result
-      }
-      
-      if (value === '') {
-        // 嵌套对象
-        const newObj = {}
-        currentObj[key] = newObj
-        stack.push({ indent, obj: currentObj })
-        currentObj = newObj
-      } else {
-        // 直接值
-        currentObj[key] = parseValue(value)
-      }
-    }
-  }
-  
-  // 确保返回的对象结构完整，合并默认值
-  return mergeWithDefaults(result)
-}
-
-// 合并默认值
-function mergeWithDefaults(config: any): any {
-  // 默认配置结构
-  const defaults = {
-    bot: {
-      onJoinGroup: {
-        rename: "【bot】"
-      },
-      sendFailureReminder: {
-        enable: false,
-        times: 3
-      },
-      offlineQueue: {
-        enable: false,
-        expire: "30m"
-      }
-    },
-    bilibili: {
-      SESSDATA: "",
-      bili_jct: "",
-      qrlogin: true,
-      interval: "25s",
-      imageMergeMode: "auto",
-      hiddenSub: false,
-      unsub: false,
-      minFollowerCap: 0,
-      disableSub: false,
-      onlyOnlineNotify: false,
-      autoParsePosts: false,
-      secAnalysis: false
-    },
-    acfun: {
-      account: "",
-      password: "",
-      unsub: false,
-      interval: "25s",
-      onlyOnlineNotify: false
-    },
-    twitter: {
-      baseUrl: [
-        "https://nitter.net/",
-        "https://nitter.privacyredirect.com/",
-        "https://nitter.tiekoetter.com/",
-        "https://nitter.poast.org/"
-      ],
-      interval: "30s",
-      userAgent: ""
-    },
-    douyin: {
-      acSignature: "",
-      acNonce: "",
-      sessionId: "",
-      userAgent: "",
-      interval: "30s",
-      onlyOnlineNotify: false
-    },
-    weibo: {
-      onlyOnlineNotify: true,
-      sub: ""
-    },
-    youtube: {
-      onlyOnlineNotify: true
-    },
-    concern: {
-      emitInterval: "5s"
-    },
-    template: {
-      enable: true
-    },
-    autoreply: {
-      group: {
-        command: ["签到"]
-      },
-      private: {
-        command: []
-      }
-    },
-    customCommandPrefix: {
-      "签到": ""
-    },
-    logLevel: "info",
-    websocket: {
-      mode: "ws-server",
-      token: "",
-      "ws-server": "0.0.0.0:15630",
-      "ws-reverse": "ws://localhost:3001"
-    },
-    admin: {
-      enable: false,
-      addr: "127.0.0.1:15631",
-      token: ""
-    },
-    reloadDelay: {
-      enable: true,
-      time: "3s"
-    },
-    extDb: {
-      enable: false,
-      path: ".ext.db"
-    },
-    telegram: {
-      enable: false,
-      token: "",
-      proxy: {
-        enable: false,
-        url: ""
-      },
-      endpoint: ""
-    }
-  }
-  
-  // 递归合并配置
-  function deepMerge(target: any, source: any): any {
-    const result = { ...target }
-    
-    for (const key in source) {
-      if (source.hasOwnProperty(key)) {
-        if (source[key] !== null && typeof source[key] === 'object') {
-          if (Array.isArray(source[key])) {
-            // 对于数组，直接使用源数组
-            result[key] = source[key]
-          } else {
-            // 对于对象，递归合并
-            if (!result[key]) {
-              result[key] = {}
-            }
-            result[key] = deepMerge(result[key], source[key])
-          }
-        } else {
-          // 对于基本类型，直接使用源值
+  for (const key in source) {
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
+      if (source[key] !== null && typeof source[key] === 'object') {
+        if (Array.isArray(source[key])) {
           result[key] = source[key]
+        } else {
+          if (!result[key]) {
+            result[key] = {}
+          }
+          result[key] = deepMerge(result[key], source[key])
         }
+      } else {
+        result[key] = source[key]
       }
-    }
-    
-    return result
-  }
-  
-  return deepMerge(defaults, config)
-}
-
-// 解析值
-function parseValue(value: string): any {
-  value = value.trim()
-  
-  if (value === 'true') return true
-  if (value === 'false') return false
-  if (!isNaN(Number(value))) return Number(value)
-  if (value.startsWith('[') && value.endsWith(']')) {
-    // 简单数组解析
-    return value.slice(1, -1).split(',').map(item => item.trim())
-  }
-  if (value.startsWith('"') && value.endsWith('"')) {
-    return value.slice(1, -1)
-  }
-  return value
-}
-
-// 生成YAML
-function generateYAML(obj: any, indent: number = 0): string {
-  const spaces = '  '.repeat(indent)
-  let result = ''
-  
-  for (const [key, value] of Object.entries(obj)) {
-    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      result += `${spaces}${key}:\n`
-      result += generateYAML(value, indent + 1)
-    } else if (Array.isArray(value)) {
-      result += `${spaces}${key}:\n`
-      for (const item of value) {
-        result += `${spaces}  - ${item}\n`
-      }
-    } else {
-      result += `${spaces}${key}: ${value}\n`
     }
   }
   

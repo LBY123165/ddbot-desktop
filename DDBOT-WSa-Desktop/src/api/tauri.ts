@@ -1,118 +1,143 @@
-// 提供默认的模拟实现
-const defaultInvoke: any = async (cmd: string, args?: any) => {
-  console.log(`Mock invoke: ${cmd}`, args);
-  
-  // 根据命令返回模拟数据
-  switch (cmd) {
-    case 'read_config_file':
-      return `bot:\n  onJoinGroup:\n    rename: "【bot】"\n  sendFailureReminder:\n    enable: false\n    times: 3\n  offlineQueue:\n    enable: false\n    expire: 30m\nbilibili:\n  SESSDATA: \n  bili_jct: \n  qrlogin: true\n  interval: 25s\n  imageMergeMode: "auto"\n  hiddenSub: false\n  unsub: false\n  minFollowerCap: 0\n  disableSub: false\n  onlyOnlineNotify: false\n  autoParsePosts: false\n  secAnalysis: false\nlogLevel: info`;
-    case 'write_config_file':
-      console.log('Mock write config file:', args?.filename);
-      console.log('Config content:', args?.content);
-      return null;
-    case 'read_logs_tail':
-      return [
-        '[INFO] DDBOT-WSa started',
-        '[INFO] Loading configuration...',
-        '[INFO] Starting WebSocket server...',
-        '[INFO] Ready to accept connections',
-        '[INFO] Checking for updates...'
-      ];
-    case 'list_config_backups':
-      return [];
-    case 'check_firewall_rule':
-      return true;
-    case 'get_current_version':
-      return '1.0.0';
-    case 'get_admin_password':
-      return 'admin123';
-    default:
-      console.log(`Mock invoke: ${cmd} (unhandled)`, args);
-      return null;
+// 内存存储，用于在浏览器环境中模拟配置文件的保存和读取
+const memoryStorage: Record<string, string> = {
+  'application.yaml': `bot:\n  onJoinGroup:\n    rename: "【bot】"\n  sendFailureReminder:\n    enable: false\n    times: 3\n  offlineQueue:\n    enable: false\n    expire: 30m\nbilibili:\n  SESSDATA: \n  bili_jct: \n  qrlogin: true\n  interval: 25s\n  imageMergeMode: "auto"\n  hiddenSub: false\n  unsub: false\n  minFollowerCap: 0\n  disableSub: false\n  onlyOnlineNotify: false\n  autoParsePosts: false\n  secAnalysis: false\nlogLevel: info`
+};
+
+// 仅保留一个Go后端
+const GO_API_BASE = 'http://localhost:15631/api/v1';
+
+// 提供纯前端 Web 面板实现
+const invoke: any = async (cmd: string, args?: any) => {
+  console.log(`Invoke: ${cmd}`, args);
+
+  try {
+    switch (cmd) {
+      // 纯 WebUI 无法启动/停止底层 Go 进程
+      case 'process_status_text':
+        try {
+          const res = await fetch(`${GO_API_BASE}/health`);
+          return res.ok ? 'running' : 'stopped';
+        } catch {
+          return 'stopped';
+        }
+      case 'process_start':
+      case 'process_stop':
+      case 'process_restart':
+        console.warn('Cannot control process purely from frontend.');
+        return;
+
+      // 数据获取 (Go 后端)
+      case 'call_onebot_status_api':
+        const obRes = await fetch(`${GO_API_BASE}/onebot/status`);
+        return await obRes.json();
+      case 'onebot_status_text':
+        try {
+          const obStatus = await fetch(`${GO_API_BASE}/onebot/status`).then(r => r.json());
+          return obStatus.online ? 'Online' : 'Offline';
+        } catch {
+          return 'Offline';
+        }
+      case 'call_subs_summary_api':
+        const subRes = await fetch(`${GO_API_BASE}/subs/summary`);
+        return await subRes.json();
+      case 'subs_summary_text':
+        try {
+          const subData = await fetch(`${GO_API_BASE}/subs/summary`).then(r => r.json());
+          return `${subData.total} Subs`;
+        } catch {
+          return 'Offline';
+        }
+
+      // 配置文件相关
+      case 'read_config_file':
+        const filename = args?.filename || 'application.yaml';
+        try {
+          const cfgRes = await fetch(`http://localhost:3000/api/config?filename=${filename}`);
+          if (cfgRes.ok) {
+            const data = await cfgRes.json();
+            return data.content;
+          }
+        } catch (e) {
+          console.error('Failed to fetch config from Rust API', e);
+        }
+        return memoryStorage[filename] || '';
+
+      case 'write_config_file':
+        const writeFilename = args?.filename || 'application.yaml';
+        let contentObj = args?.content || '';
+
+        try {
+          // If the caller gave an object (from the graphical editor without yaml package earlier), 
+          // they'd pass stringified JSON, but now they should pass text config.
+          // Wait, if it's already string, we just send it.
+          const textContent = typeof contentObj === 'string' ? contentObj : JSON.stringify(contentObj, null, 2);
+
+          await fetch(`http://localhost:3000/api/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: writeFilename, content: textContent })
+          });
+
+          // Trigger hot-reload in Go Main process if it's running
+          if (writeFilename === 'application.yaml') {
+            try {
+              await fetch(`${GO_API_BASE}/config/reload`, { method: 'POST' });
+              console.log('Triggered hot-reload on DDBot');
+            } catch (ignore) { }
+          }
+          return null;
+
+        } catch (e) {
+          console.error('Failed to save config via Rust API', e);
+          throw e;
+        }
+
+      case 'read_logs_tail':
+        try {
+          const logRes = await fetch(`http://localhost:3000/api/logs?lines=100`);
+          if (logRes.ok) {
+            const data = await logRes.json();
+            if (data.logs && data.logs.length > 0) {
+              return data.logs;
+            }
+          }
+        } catch (e) { }
+        return [
+          '[INFO] Waiting for logs or DDBOT is not running...'
+        ];
+
+      case 'list_config_backups':
+        return [];
+      case 'check_firewall_rule':
+        return false;
+      case 'get_current_version':
+        return '1.0.0';
+      case 'get_admin_password':
+        return 'admin123';
+      default:
+        console.log(`Mock invoke fallback: ${cmd} (unhandled)`, args);
+        return null;
+    }
+  } catch (err) {
+    console.error(`Error in invoke ${cmd}:`, err);
+    return null;
   }
 };
 
-const defaultListen: any = async (event: string, callback: any) => {
+const listen: any = async (event: string, callback: any) => {
   console.log(`Mock listen: ${event}`);
   return {
     remove: () => console.log(`Mock remove listener: ${event}`)
   };
 };
 
-const defaultAppDataDir: any = async () => {
+const appDataDir: any = async () => {
   return 'C:\\Users\\User\\AppData\\Roaming\\DDBOT-WSa-Desktop';
 };
 
-const defaultJoin: any = async (...paths: string[]) => {
+const join: any = async (...paths: string[]) => {
   return paths.join('\\');
 };
-
-// 导出的变量，始终保持为有效的函数
-let invoke: any = defaultInvoke;
-let listen: any = defaultListen;
-let appDataDir: any = defaultAppDataDir;
-let join: any = defaultJoin;
-
-// 尝试替换为实际的Tauri API实现
-async function initTauriAPI() {
-  try {
-    // 检查是否在浏览器环境中
-    if (typeof window !== 'undefined' && window.location && window.location.protocol.startsWith('http')) {
-      console.log('Running in browser environment, using mock implementations');
-      return;
-    }
-    
-    // 动态导入Tauri API
-    const core = await import('@tauri-apps/api/core');
-    const event = await import('@tauri-apps/api/event');
-    const path = await import('@tauri-apps/api/path');
-    
-    console.log('Tauri API modules loaded:', {
-      core: !!core,
-      event: !!event,
-      path: !!path,
-      coreInvoke: core?.invoke
-    });
-    
-    // 检查导入的API是否有效
-    if (core && typeof core.invoke === 'function') {
-      console.log('Tauri invoke API available, using real implementation');
-      invoke = core.invoke;
-    } else {
-      console.warn('Tauri invoke API not available, keeping mock implementation');
-      invoke = defaultInvoke;
-    }
-    
-    if (event && typeof event.listen === 'function') {
-      listen = event.listen;
-    } else {
-      listen = defaultListen;
-    }
-    
-    if (path && typeof path.appDataDir === 'function') {
-      appDataDir = path.appDataDir;
-    } else {
-      appDataDir = defaultAppDataDir;
-    }
-    
-    if (path && typeof path.join === 'function') {
-      join = path.join;
-    } else {
-      join = defaultJoin;
-    }
-  } catch (error) {
-    console.warn('Tauri API not available, using mock implementations');
-    console.error('Error loading Tauri API:', error);
-    // 确保变量恢复为默认的mock实现
-    invoke = defaultInvoke;
-    listen = defaultListen;
-    appDataDir = defaultAppDataDir;
-    join = defaultJoin;
-  }
-}
-
-// 立即执行初始化
-initTauriAPI();
 
 // 模拟插件功能
 const relaunch = async (): Promise<void> => {
@@ -251,12 +276,12 @@ export const TauriAPI = {
     };
   },
 
-  // --- Firewall management ---
+  // --- Firewall management (removed) ---
   get firewall() {
     return {
-      check: (): Promise<boolean> => invoke('check_firewall_rule'),
-      add: (): Promise<boolean> => invoke('add_firewall_rule'),
-      remove: (): Promise<boolean> => invoke('remove_firewall_rule'),
+      check: (): Promise<boolean> => Promise.resolve(false),
+      add: (): Promise<boolean> => Promise.resolve(false),
+      remove: (): Promise<boolean> => Promise.resolve(false),
     };
   },
 
@@ -272,7 +297,7 @@ export const TauriAPI = {
     return {
       check: async (): Promise<UpdateCheck> => {
         const update = await check();
-        const currentVersion = await invoke<string>('get_current_version');
+        const currentVersion = await invoke('get_current_version');
 
         pendingUpdateInstance = update;
 
@@ -357,7 +382,7 @@ export const TauriAPI = {
       setAutoCheck: (e: boolean): Promise<void> => invoke('set_auto_check_enabled', { enabled: e }),
       isAutoCheckEnabled: (): Promise<boolean> => invoke('is_auto_check_enabled'),
       onBackgroundUpdate: (cb: (u: UpdateCheck) => void) =>
-        listen('background-update-available', e => cb(e.payload as UpdateCheck)),
+        listen('background-update-available', (e: any) => cb(e.payload as UpdateCheck)),
     };
   },
 

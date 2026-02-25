@@ -7,6 +7,7 @@ import ConfigEditor from '../pages/ConfigEditor.vue'
 import GraphicalConfigEditor from '../pages/GraphicalConfigEditor.vue'
 import LogsPage from '../pages/LogsPage.vue'
 import TemplateCenter from '../pages/TemplateCenter.vue'
+import SubscriptionManager from '../pages/SubscriptionManager.vue'
 
 const routes = [
   {
@@ -14,6 +15,12 @@ const routes = [
     name: 'Home',
     component: HomePage,
     meta: { title: '概览' },
+  },
+  {
+    path: '/subscriptions',
+    name: 'Subscriptions',
+    component: SubscriptionManager,
+    meta: { title: '订阅管理' },
   },
   {
     path: '/config',

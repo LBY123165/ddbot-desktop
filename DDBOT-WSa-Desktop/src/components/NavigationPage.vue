@@ -28,7 +28,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Activity, Home, Settings, Zap, FileText, ScrollText, LayoutTemplate } from 'lucide-vue-next'
+import { Activity, Home, Settings, Zap, FileText, ScrollText, LayoutTemplate, Database } from 'lucide-vue-next'
 import { useAppStore } from '../stores/app'
 
 const appStore = useAppStore()
@@ -38,6 +38,11 @@ const navItems = computed(() => [
     name: '概览',
     path: '/',
     icon: Home,
+  },
+  {
+    name: '订阅',
+    path: '/subscriptions',
+    icon: Database,
   },
   {
     name: '配置',

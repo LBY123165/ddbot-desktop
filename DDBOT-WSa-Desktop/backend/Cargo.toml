@@ -14,3 +14,11 @@ tower-http = { version = "0.4", features = ["cors"] }
 lazy_static = "1.4"
 rusqlite = { version = "0.38.0", features = ["bundled"] }
 chrono = "0.4.43"
+reqwest = { version = "0.11", features = ["json"] }
+zip = "0.6"
+flate2 = "1.0"
+tar = "0.4"
+regex = "1.10"
+anyhow = "1.0.102"
+rand = "0.10.0"
+walkdir = "2.5.0"

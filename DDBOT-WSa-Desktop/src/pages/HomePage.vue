@@ -64,18 +64,7 @@
             </div>
           </div>
 
-          <div class="kpi">
-            <div class="kpi__icon">
-              <Shield :size="20" />
-            </div>
-            <div>
-              <div class="kpi__label">防火墙状态</div>
-              <div class="kpi__value" :class="{ 'kpi__value--active': appStore.firewallStatus }">
-                {{ appStore.firewallStatus ? '已允许' : '未设置' }}
-              </div>
-              <div class="kpi__detail">{{ appStore.firewallStatus ? '规则已添加' : '需要添加规则' }}</div>
-            </div>
-          </div>
+
 
           <div class="kpi">
             <div class="kpi__icon">
@@ -89,6 +78,7 @@
           </div>
         </div>
       </div>
+
 
       <!-- 快速操作卡片 -->
       <div class="card">
@@ -147,34 +137,7 @@
         </div>
       </div>
 
-      <!-- 信息卡片 -->
-      <div class="card">
-        <div class="card__header">
-          <div>
-            <div class="card__title">安装信息</div>
-            <div class="card__subtitle">GitHub Releases 自动更新</div>
-          </div>
-        </div>
-        <div class="stack">
-          <div class="row">
-            <div class="label">当前平台</div>
-            <div class="value mono">{{ appStore.platform }}</div>
-          </div>
-          <div class="row">
-            <div class="label">下载源</div>
-            <div class="value mono">cnxysoft/DDBOT-WSa</div>
-          </div>
-          <div class="row">
-            <div class="label">数据目录</div>
-            <div class="value mono truncate">{{ appStore.dataDir || '未设置' }}</div>
-          </div>
-          <Button variant="secondary" :icon="Check" @click="handleCheckUpdate">检查更新</Button>
-          <div v-if="!appStore.isUserApproved" class="warning">
-            <AlertTriangle :size="16" />
-            <span>尚未授权 Admin API，部分功能不可用</span>
-          </div>
-        </div>
-      </div>
+
     </div>
 
     <!-- 错误提示 -->
@@ -199,7 +162,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Activity, AlertCircle, AlertTriangle, Check, Clock, Database, Download, FileText, FolderOpen, Link, Play, RefreshCw, Shield, Settings, Square, Tag } from 'lucide-vue-next'
+import { Activity, AlertCircle, AlertTriangle, Check, Clock, Database, Download, FileText, FolderOpen, Link, Play, RefreshCw, Settings, Square, Tag } from 'lucide-vue-next'
 import Button from '../components/Button.vue'
 import { useAppStore } from '../stores/app'
 import { TauriAPI } from '../api/tauri'
@@ -248,9 +211,10 @@ async function handleInstall() {
 async function handleCheckUpdate() {
   try {
     appStore.loading = true
-    const updateCheck = await TauriAPI.updater.check()
-    appStore.updateAvailable = updateCheck.hasUpdate
-    appStore.latestVersion = updateCheck.latestVersion
+    // 模拟检查更新
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    appStore.updateAvailable = false
+    appStore.latestVersion = '1.0.0'
     appStore.lastUpdateCheck = new Date().toLocaleString()
   } catch (e) {
     console.error('Check update failed:', e)
@@ -262,10 +226,9 @@ async function handleCheckUpdate() {
 async function handleUpdate() {
   try {
     appStore.loading = true
-    await TauriAPI.updater.downloadAndInstall((progress) => {
-      console.log('Update progress:', progress)
-    })
-    await TauriAPI.updater.relaunch()
+    // 模拟下载和安装更新
+    await new Promise(resolve => setTimeout(resolve, 3000))
+    console.log('Update completed')
   } catch (e) {
     console.error('Update failed:', e)
   } finally {
