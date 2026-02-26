@@ -43,6 +43,17 @@
           </div>
         </div>
 
+        <div class="section">
+          <div class="section__title">安全设置</div>
+          <div class="row">
+            <div class="label">前端访问密码</div>
+            <div class="value" style="flex: 1; padding: 0 16px;">
+              <Input type="password" v-model="adminPassword" placeholder="留空则保持原密码..." />
+            </div>
+            <Button size="sm" variant="primary" @click="updatePassword">修改密码</Button>
+          </div>
+        </div>
+
         <!-- 下载进度条 -->
         <div v-if="installProgress.active" class="section">
           <div class="section__title">安装进度</div>
@@ -85,6 +96,7 @@
 import { ref, onMounted, reactive } from 'vue'
 import { AlertCircle, Download, Folder } from 'lucide-vue-next'
 import Button from '../components/Button.vue'
+import Input from '../components/Input.vue'
 import ProgressBar from '../components/ProgressBar.vue'
 import { useAppStore } from '../stores/app'
 
@@ -95,6 +107,7 @@ const workdir = ref('')
 const binaryPath = ref('')
 const managedDir = ref('')
 const installing = ref(false)
+const adminPassword = ref('')
 
 // 安装进度状态
 const installProgress = reactive({
@@ -329,6 +342,33 @@ async function openWorkDir() {
   }
 }
 
+async function updatePassword() {
+  if (!adminPassword.value) {
+    alert('请输入新密码');
+    return;
+  }
+  if (!confirm('确定要修改前端访问密码吗？修改后将重新登录。')) return;
+
+  try {
+    const res = await fetch('/api/auth/update_password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newPassword: adminPassword.value })
+    });
+    
+    if (res.ok) {
+      alert('密码更新成功！请重新登录。');
+      window.location.hash = '#/login';
+      adminPassword.value = '';
+    } else {
+      const err = await res.json();
+      alert(`密码修改失败: ${err.error}`);
+    }
+  } catch (e: any) {
+    alert(`网络异常: ${e.message}`);
+  }
+}
+
 onMounted(() => {
   loadPaths()
 })
@@ -343,15 +383,15 @@ onMounted(() => {
 
 .card {
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
 
 .card__header {
   padding: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .card__title {
@@ -381,9 +421,9 @@ onMounted(() => {
 .section__title {
   font-size: 14px;
   font-weight: 600;
-  color: rgba(232, 234, 240, 0.9);
+  color: var(--text-primary);
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--bg-card);
 }
 
 .row {
@@ -409,13 +449,13 @@ onMounted(() => {
   gap: 8px;
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--bg-card);
 }
 
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--bg-card);
   padding: 4px 8px;
   border-radius: 4px;
   max-width: 400px;
@@ -439,7 +479,7 @@ onMounted(() => {
   padding: 8px 12px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--bg-card);
   color: rgba(232, 234, 240, 0.95);
   font-size: 13px;
   outline: none;
@@ -465,7 +505,7 @@ onMounted(() => {
   padding: 12px 16px;
   border-radius: 10px;
   background: rgba(239, 68, 68, 0.9);
-  color: white;
+  color: var(--text-primary);
   font-size: 13px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(10px);

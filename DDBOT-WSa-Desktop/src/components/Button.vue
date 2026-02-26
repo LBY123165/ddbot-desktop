@@ -83,7 +83,7 @@ function handleClick(event: MouseEvent) {
 .btn--primary {
   border-color: rgba(124, 92, 255, 0.35);
   background: rgba(124, 92, 255, 0.2);
-  color: rgba(232, 234, 240, 1);
+  color: var(--text-primary);
 }
 
 .btn--primary:hover:not(.btn--disabled) {
@@ -92,18 +92,18 @@ function handleClick(event: MouseEvent) {
 
 .btn--secondary {
   border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(232, 234, 240, 0.9);
+  background: var(--bg-card);
+  color: var(--text-primary);
 }
 
 .btn--secondary:hover:not(.btn--disabled) {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--border-color);
 }
 
 .btn--danger {
   border-color: rgba(239, 68, 68, 0.35);
   background: rgba(239, 68, 68, 0.2);
-  color: rgba(232, 234, 240, 1);
+  color: var(--text-primary);
 }
 
 .btn--danger:hover:not(.btn--disabled) {
@@ -113,7 +113,7 @@ function handleClick(event: MouseEvent) {
 .btn--success {
   border-color: rgba(16, 185, 129, 0.35);
   background: rgba(16, 185, 129, 0.2);
-  color: rgba(232, 234, 240, 1);
+  color: var(--text-primary);
 }
 
 .btn--success:hover:not(.btn--disabled) {

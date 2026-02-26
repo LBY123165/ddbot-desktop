@@ -215,8 +215,8 @@ onUnmounted(() => {
 
 .card {
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
@@ -227,7 +227,7 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 16px;
   padding: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--border-color);
   flex-wrap: wrap;
 }
 
@@ -244,8 +244,8 @@ onUnmounted(() => {
 
 .card__footer {
   padding: 12px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(0, 0, 0, 0.15);
+  border-top: 1px solid var(--bg-card);
+  background: var(--bg-card);
 }
 
 .actions {
@@ -308,7 +308,7 @@ onUnmounted(() => {
 
 .logs-header {
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--bg-card);
   background: rgba(0, 0, 0, 0.1);
   font-size: 12px;
 }
@@ -323,7 +323,7 @@ onUnmounted(() => {
   flex: 1;
   overflow: auto;
   padding: 16px;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--bg-card);
 }
 
 .logs-empty {
@@ -338,7 +338,7 @@ onUnmounted(() => {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   font-size: 12px;
   line-height: 1.4;
-  color: rgba(232, 234, 240, 0.9);
+  color: var(--text-primary);
   white-space: pre-wrap;
   word-wrap: break-word;
 }
@@ -366,7 +366,7 @@ onUnmounted(() => {
 }
 
 .logs-body::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-card);
   border-radius: 4px;
 }
 

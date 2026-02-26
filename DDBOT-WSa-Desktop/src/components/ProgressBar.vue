@@ -88,10 +88,10 @@ const progressClass = computed(() => {
 
 <style scoped>
 .progress-container {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-card);
   border-radius: 12px;
   padding: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color);
   transition: all 0.3s ease;
 }
 
@@ -121,7 +121,7 @@ const progressClass = computed(() => {
 
 .progress-bar {
   height: 8px;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--bg-card);
   border-radius: 4px;
   overflow: hidden;
   position: relative;
@@ -171,7 +171,7 @@ const progressClass = computed(() => {
 }
 
 .status-text {
-  color: rgba(232, 234, 240, 0.8);
+  color: var(--text-secondary);
 }
 
 .speed-indicator {
@@ -218,12 +218,12 @@ const progressClass = computed(() => {
 
 .step--completed .step-icon {
   background: #10b981;
-  color: white;
+  color: var(--text-primary);
 }
 
 .step--active .step-icon {
   background: #7c5cff;
-  color: white;
+  color: var(--text-primary);
 }
 
 .step--pending .step-icon {
@@ -239,7 +239,7 @@ const progressClass = computed(() => {
 
 .step-text {
   font-size: 13px;
-  color: rgba(232, 234, 240, 0.9);
+  color: var(--text-primary);
 }
 
 .spin {

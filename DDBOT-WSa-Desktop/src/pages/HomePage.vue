@@ -258,8 +258,8 @@ async function handleUpdate() {
 
 .card {
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
@@ -274,7 +274,7 @@ async function handleUpdate() {
   justify-content: space-between;
   gap: 16px;
   padding: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .card__title {
@@ -307,8 +307,8 @@ async function handleUpdate() {
   gap: 12px;
   border-radius: 14px;
   padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
 }
 
 .kpi__icon {
@@ -362,7 +362,7 @@ async function handleUpdate() {
   justify-content: space-between;
   gap: 12px;
   padding: 8px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--bg-card);
 }
 
 .row:last-child {
@@ -411,7 +411,7 @@ async function handleUpdate() {
   justify-content: center;
   gap: 8px;
   padding: 32px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
 }
 
 .home__error {
@@ -424,7 +424,7 @@ async function handleUpdate() {
   padding: 12px 16px;
   border-radius: 10px;
   background: rgba(239, 68, 68, 0.9);
-  color: white;
+  color: var(--text-primary);
   font-size: 13px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(10px);
@@ -442,7 +442,7 @@ async function handleUpdate() {
   padding: 12px 16px;
   border-radius: 10px;
   background: rgba(59, 130, 246, 0.9);
-  color: white;
+  color: var(--text-primary);
   font-size: 13px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(10px);

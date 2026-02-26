@@ -134,9 +134,9 @@ function clamp(val: number): number {
   align-items: center;
   justify-content: center;
   width: 32px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-card);
   border: none;
-  color: rgba(232, 234, 240, 0.95);
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 14px;
@@ -168,8 +168,8 @@ function clamp(val: number): number {
   border: none;
   border-left: 1px solid rgba(255, 255, 255, 0.1);
   border-right: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(232, 234, 240, 0.95);
+  background: var(--bg-card);
+  color: var(--text-primary);
   font-size: 13px;
   outline: none;
   text-align: center;
@@ -184,7 +184,7 @@ function clamp(val: number): number {
 }
 
 .input-number__input:focus {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--border-color);
 }
 
 .input-number__input::-webkit-inner-spin-button,

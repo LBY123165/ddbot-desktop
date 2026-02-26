@@ -44,6 +44,7 @@
                 <span class="type-badge">{{ sub.type }}</span>
               </td>
               <td>
+                <Button size="sm" variant="secondary" @click="openSettings(sub)" class="mr-2">设置</Button>
                 <Button size="sm" variant="danger" @click="removeSub(sub)">删除</Button>
               </td>
             </tr>
@@ -89,6 +90,64 @@
         </div>
       </div>
     </div>
+
+    <!-- Subscription Settings Modal -->
+    <div v-if="showSettingsModal" class="modal-overlay">
+      <div class="modal modal-lg">
+        <h3 class="modal-title">订阅推送设置</h3>
+        
+        <div class="info-box mb-4">
+          <strong>配置填写说明：</strong><br/>
+          - <strong>推送场景</strong>由多个类型组成，如 <code>news</code>(动态/文章) 或 <code>live</code>(直播)。若要同时匹配，用 <code>/</code> 分隔：<code>news/live</code>。<br/>
+          - <strong>@特定人</strong>：填写QQ号，多个使用半角逗号 <code>,</code> 隔开。<br/>
+          - <strong>文本过滤器</strong>必须符合严格的 JSON 格式结构。支持 <code>text</code> (包含至少某个词) 和 <code>not_text</code> (不包含任何这些词)。示例：<br/>
+          <pre class="code-sm"><code>[
+  {"type":"not_text", "config":"{\"text\":[\"屏蔽关键词1\", \"广告\"]}"},
+  {"type":"text", "config":"{\"text\":[\"必须包含的词\"]}"}
+]</code></pre>
+        </div>
+
+        <div v-if="configLoading" class="empty-state">加载中...</div>
+        <div v-else class="settings-grid">
+          <div class="form-group">
+            <label>@全体 推送场景 (如: news/live, news, live等)</label>
+            <input type="text" v-model="editConfig.group_concern_at.at_all" class="input" placeholder="留空为不艾特" />
+          </div>
+          
+          <div class="form-group">
+            <label>@特定人 QQ号 (多个用逗号隔开)</label>
+            <input type="text" v-model="atSomeoneText" class="input" placeholder="例如: 12345,67890" />
+            <p class="text-xs mt-1 opacity-70">在哪些场景艾特他们，由群管理员指令额外调整</p>
+          </div>
+          
+          <div class="form-group">
+            <label>直播间改标题时 推送场景</label>
+            <input type="text" v-model="editConfig.group_concern_notify.title_change_notify" class="input" placeholder="例如: live 或 news 或者空" />
+          </div>
+          
+          <div class="form-group">
+            <label>主播下播时 推送场景</label>
+            <input type="text" v-model="editConfig.group_concern_notify.offline_notify" class="input" placeholder="例如: live 或 news 或者空" />
+          </div>
+          
+          <div class="form-group">
+            <label>特别提醒 推送场景 (extend_notify)</label>
+            <input type="text" v-model="editConfig.group_concern_notify.extend_notify" class="input" placeholder="例如: news" />
+          </div>
+
+          <div class="form-group span-full">
+            <label>文本过滤器 (仅允许包含或不包含某关键字时的推送) [JSON模式]</label>
+            <textarea v-model="filterRulesText" class="input" rows="4" placeholder='[{"type":"not_text","config":"{\"text\":[\"黑名单词\"]}"}]'></textarea>
+            <p class="text-xs mt-1 opacity-70 text-right"><a href="https://github.com/cnxysoft/DDBOT-WSa" target="_blank" class="underline">查阅过滤器编写规范</a></p>
+          </div>
+        </div>
+        
+        <div class="modal-actions">
+          <Button variant="secondary" @click="showSettingsModal = false">取消</Button>
+          <Button variant="primary" @click="saveSettings">保存配置</Button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -117,7 +176,19 @@ const newSub = ref<SubInfo>({
   groupCode: 0
 })
 
-const API_BASE = 'http://localhost:15631/api/v1'
+const showSettingsModal = ref(false)
+const configLoading = ref(false)
+const activeSubForConfig = ref<SubInfo | null>(null)
+const editConfig = ref<any>({
+  group_concern_at: { at_all: '', at_someone: [] },
+  group_concern_notify: { title_change_notify: '', offline_notify: '', extend_notify: '' },
+  group_concern_filter: { type: '', config: '', rules: [] }
+})
+const atSomeoneText = ref('')
+const filterRulesText = ref('[]')
+
+const API_BASE = '/api/v1'
+const ADMIN_API_BASE = '/api/admin'
 
 const fetchSubscriptions = async () => {
   try {
@@ -193,6 +264,88 @@ const removeSub = async (sub: SubInfo) => {
   }
 }
 
+const openSettings = async (sub: SubInfo) => {
+  activeSubForConfig.value = sub
+  showSettingsModal.value = true
+  configLoading.value = true
+  
+  try {
+    const url = new URL(`${ADMIN_API_BASE}/sub/config`)
+    url.searchParams.append('site', sub.site)
+    url.searchParams.append('id', typeof sub.id === 'string' || typeof sub.id === 'number' ? String(sub.id) : '')
+    url.searchParams.append('groupCode', String(sub.groupCode))
+
+    const res = await fetch(url.toString())
+    if (res.ok) {
+      const data = await res.json()
+      editConfig.value = {
+        group_concern_at: { at_all: '', at_someone: [], ...(data.group_concern_at || {}) },
+        group_concern_notify: { title_change_notify: '', offline_notify: '', extend_notify: '', ...(data.group_concern_notify || {}) },
+        group_concern_filter: { type: '', config: '', rules: [], ...(data.group_concern_filter || {}) },
+      }
+      
+      // Parse map fields for UI
+      if (editConfig.value.group_concern_at.at_someone && Array.isArray(editConfig.value.group_concern_at.at_someone)) {
+        atSomeoneText.value = editConfig.value.group_concern_at.at_someone.join(',')
+      } else {
+        atSomeoneText.value = ''
+      }
+      
+      if (editConfig.value.group_concern_filter.rules) {
+        filterRulesText.value = JSON.stringify(editConfig.value.group_concern_filter.rules, null, 2)
+      } else {
+        filterRulesText.value = '[]'
+      }
+    } else {
+      throw new Error(`无法获取配置: ${res.statusText}`)
+    }
+  } catch (e: any) {
+    alert(e.message)
+    showSettingsModal.value = false
+  } finally {
+    configLoading.value = false
+  }
+}
+
+const saveSettings = async () => {
+  if (!activeSubForConfig.value) return
+  
+  // pack text items into struct array
+  const someoneArr = atSomeoneText.value.split(',').map(s => s.trim()).filter(Boolean).map(Number)
+  editConfig.value.group_concern_at.at_someone = someoneArr
+  
+  try {
+    editConfig.value.group_concern_filter.rules = JSON.parse(filterRulesText.value || '[]')
+  } catch(e) {
+    alert("过滤器 JSON 格式错误")
+    return
+  }
+
+  try {
+    const res = await fetch(`${ADMIN_API_BASE}/sub/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+         site: activeSubForConfig.value.site,
+         id: activeSubForConfig.value.id,
+         type: activeSubForConfig.value.type,
+         groupCode: activeSubForConfig.value.groupCode,
+         config: editConfig.value
+      })
+    })
+    
+    if (res.ok) {
+      showSettingsModal.value = false
+      alert("配置保存成功")
+    } else {
+      const errData = await res.json()
+      alert(`保存失败: ${errData.error || res.statusText}`)
+    }
+  } catch (e: any) {
+    alert(`网络错误: ${e.message}`)
+  }
+}
+
 onMounted(() => {
   fetchSubscriptions()
 })
@@ -209,10 +362,10 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-card);
   padding: 20px;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--border-color);
 }
 
 .header > div {
@@ -232,9 +385,9 @@ onMounted(() => {
 }
 
 .card {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-card);
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--border-color);
   padding: 0;
   overflow: hidden;
 }
@@ -242,11 +395,30 @@ onMounted(() => {
 .empty-state {
   padding: 40px;
   text-align: center;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
 }
 
 .table-container {
   overflow-x: auto;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px;
+}
+.span-full {
+  grid-column: 1 / -1;
+}
+.modal-lg {
+  max-width: 900px !important;
+  width: 95%;
+}
+.mr-2 {
+  margin-right: 8px;
 }
 
 .subs-table {
@@ -258,14 +430,14 @@ onMounted(() => {
 .subs-table td {
   padding: 12px 16px;
   text-align: left;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .subs-table th {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--bg-card);
   font-size: 13px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
 }
 
 .subs-table td {
@@ -305,7 +477,7 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--bg-secondary);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -314,9 +486,10 @@ onMounted(() => {
 }
 
 .modal {
-  background: #1a1b1e;
-  border: 1px solid #2c2d33;
-  width: 400px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  width: 90%;
+  max-width: 400px;
   border-radius: 16px;
   padding: 24px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
@@ -342,9 +515,9 @@ onMounted(() => {
   width: 100%;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(0, 0, 0, 0.2);
-  color: white;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-primary);
   font-family: inherit;
   font-size: 14px;
   box-sizing: border-box;
@@ -352,7 +525,37 @@ onMounted(() => {
 
 .input:focus {
   outline: none;
-  border-color: #7c5cff;
+  border-color: var(--accent-color);
+}
+
+.info-box {
+  background: rgba(124, 92, 255, 0.1);
+  border-left: 4px solid var(--accent-color);
+  padding: 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  word-wrap: break-word;
+  white-space: normal;
+}
+
+.info-box strong {
+  color: var(--text-primary);
+}
+
+.code-sm {
+  background: var(--bg-card);
+  padding: 8px;
+  border-radius: 4px;
+  margin-top: 4px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+}
+.mb-4 {
+  margin-bottom: 16px;
 }
 
 .modal-actions {

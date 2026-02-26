@@ -225,8 +225,8 @@ async function startAndGoHome() {
 
 .wizard__step {
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
   padding: 24px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
@@ -249,8 +249,8 @@ async function startAndGoHome() {
   gap: 16px;
   padding: 16px;
   border-radius: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.2);
+  border: 2px solid var(--border-color);
+  background: var(--bg-card);
   cursor: pointer;
   transition: all 0.2s ease;
   width: 100%;
@@ -308,8 +308,8 @@ async function startAndGoHome() {
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.3);
-  color: rgba(232, 234, 240, 1);
+  background: var(--bg-card);
+  color: var(--text-primary);
   font-size: 13px;
   outline: none;
 }
@@ -361,7 +361,7 @@ async function startAndGoHome() {
 .wizard__info-text code {
   padding: 2px 6px;
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--bg-card);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
 }
@@ -416,7 +416,7 @@ async function startAndGoHome() {
   padding: 12px 16px;
   border-radius: 10px;
   background: rgba(239, 68, 68, 0.9);
-  color: white;
+  color: var(--text-primary);
   font-size: 13px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(10px);

@@ -83,7 +83,7 @@ function handleClick() {
 }
 
 .toggle:hover:not(.toggle--disabled) .toggle__track {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--border-color);
 }
 
 .toggle:hover:not(.toggle--disabled).toggle--checked .toggle__track {

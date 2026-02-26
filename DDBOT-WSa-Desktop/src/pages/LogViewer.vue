@@ -168,8 +168,8 @@ onUnmounted(() => {
 
 .card {
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
@@ -180,7 +180,7 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 16px;
   padding: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .card__title {
@@ -204,7 +204,7 @@ onUnmounted(() => {
   padding: 8px 12px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--bg-card);
   color: rgba(232, 234, 240, 0.95);
   font-size: 13px;
   outline: none;
@@ -219,7 +219,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 20px;
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--bg-card);
   background: rgba(0, 0, 0, 0.1);
   flex-wrap: wrap;
 }
@@ -254,7 +254,7 @@ onUnmounted(() => {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  color: white;
+  color: var(--text-primary);
   font-size: 12px;
 }
 
@@ -275,11 +275,11 @@ onUnmounted(() => {
   display: flex;
   gap: 12px;
   padding: 8px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--bg-card);
 }
 
 .log-entry:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-card);
 }
 
 .log-timestamp {
@@ -310,7 +310,7 @@ onUnmounted(() => {
 
 .log-message {
   flex: 1;
-  color: #e8eaf0;
+  color: var(--text-primary);
 }
 
 .log-message.wrap-lines {
@@ -335,7 +335,7 @@ onUnmounted(() => {
   padding: 12px 16px;
   border-radius: 10px;
   background: rgba(239, 68, 68, 0.9);
-  color: white;
+  color: var(--text-primary);
   font-size: 13px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(10px);

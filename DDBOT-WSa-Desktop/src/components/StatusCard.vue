@@ -50,8 +50,8 @@ const displayStatusText = computed(() => props.statusText || statusTexts[props.s
 <style scoped>
 .status-card {
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
   padding: 16px;
   transition: all 0.2s ease;
 }

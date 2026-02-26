@@ -104,8 +104,8 @@ defineExpose({
   padding: 8px 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(232, 234, 240, 0.95);
+  background: var(--bg-card);
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s ease;
   min-width: 120px;
@@ -128,12 +128,12 @@ defineExpose({
 
 .select__trigger:hover:not(.select--disabled) {
   border-color: rgba(124, 92, 255, 0.3);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--border-color);
 }
 
 .select--open .select__trigger {
   border-color: rgba(124, 92, 255, 0.5);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--border-color);
 }
 
 .select--disabled .select__trigger {
@@ -196,7 +196,7 @@ defineExpose({
 }
 
 .select__menu::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-card);
   border-radius: 3px;
 }
 

@@ -14,6 +14,10 @@ async function callApi<T>(endpoint: string, options: RequestInit = {}): Promise<
   })
 
   if (!response.ok) {
+    if (response.status === 401) {
+      window.location.hash = '#/login'
+      throw new Error('未授权访问，需要登录')
+    }
     const errorText = await response.text().catch(() => response.statusText)
     throw new Error(errorText || `API 调用失败: ${response.status}`)
   }
@@ -131,11 +135,11 @@ export const useAppStore = defineStore('app', () => {
 
       if (obStat) {
         onebotStatus.value = {
-          connected: obStat.connected,
+          connected: obStat.connected ?? obStat.online,
           online: obStat.online,
           good: obStat.good,
           protocol: obStat.protocol || 'OneBot v11',
-          selfId: obStat.self_id
+          selfId: obStat.self_id || obStat.selfId
         }
       }
 

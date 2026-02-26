@@ -202,8 +202,8 @@ onMounted(() => {
 
 .card {
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
@@ -214,7 +214,7 @@ onMounted(() => {
   justify-content: space-between;
   gap: 16px;
   padding: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .card__title {
@@ -243,8 +243,8 @@ onMounted(() => {
 
 .backups-panel {
   width: 300px;
-  background: rgba(0, 0, 0, 0.25);
-  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--bg-card);
+  border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   animation: slide-in 0.3s ease;
@@ -260,7 +260,7 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--bg-card);
   font-size: 13px;
   font-weight: 600;
 }
@@ -281,7 +281,7 @@ onMounted(() => {
 .backup-item {
   padding: 10px 12px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-card);
   margin-bottom: 8px;
   display: flex;
   justify-content: space-between;
@@ -290,7 +290,7 @@ onMounted(() => {
 }
 
 .backup-item:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-card);
 }
 
 .backup-info {
@@ -324,8 +324,8 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid var(--bg-card);
+  background: var(--bg-card);
 }
 
 .toolbar-item {
@@ -343,7 +343,7 @@ onMounted(() => {
   padding: 6px 10px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--bg-card);
   color: rgba(232, 234, 240, 0.95);
   font-size: 13px;
   outline: none;
@@ -387,8 +387,8 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(0, 0, 0, 0.15);
+  border-top: 1px solid var(--bg-card);
+  background: var(--bg-card);
   font-size: 12px;
 }
 
@@ -412,7 +412,7 @@ onMounted(() => {
   padding: 12px 16px;
   border-radius: 10px;
   background: rgba(239, 68, 68, 0.9);
-  color: white;
+  color: var(--text-primary);
   font-size: 13px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(10px);

@@ -27,17 +27,16 @@ onMounted(async () => {
 .app {
   display: flex;
   min-height: 100vh;
-  color: #e8eaf0;
-  background: radial-gradient(1200px 700px at 10% 0%, rgba(124, 92, 255, 0.18), transparent 60%),
-    radial-gradient(900px 600px at 90% 10%, rgba(0, 214, 160, 0.14), transparent 55%),
-    linear-gradient(180deg, #0b1020, #070a14);
+  width: 100%;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  background-image: radial-gradient(1200px 700px at 10% 0%, rgba(124, 92, 255, 0.18), transparent 60%),
+    radial-gradient(900px 600px at 90% 10%, rgba(0, 214, 160, 0.14), transparent 55%);
 }
 
 .main {
   flex: 1;
   padding: 22px;
-  max-width: 1400px;
-  margin: 0 auto;
   width: 100%;
 }
 </style>

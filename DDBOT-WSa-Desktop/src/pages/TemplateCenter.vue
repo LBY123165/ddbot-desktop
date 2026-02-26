@@ -299,8 +299,8 @@ onMounted(() => {
 
 .card {
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
@@ -311,7 +311,7 @@ onMounted(() => {
   justify-content: space-between;
   gap: 16px;
   padding: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .card__title {
@@ -340,8 +340,8 @@ onMounted(() => {
 
 .template-card {
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
   padding: 16px;
   transition: all 0.2s ease;
 }
@@ -400,7 +400,7 @@ onMounted(() => {
 }
 
 .template-preview {
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--bg-card);
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 16px;
@@ -456,7 +456,7 @@ onMounted(() => {
 }
 
 .modal {
-  background: #1a1f2e;
+  background: var(--bg-primary);
   border-radius: 16px;
   width: 90%;
   max-width: 600px;
@@ -470,7 +470,7 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .modal-header h2 {
@@ -503,7 +503,7 @@ onMounted(() => {
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--bg-card);
   color: rgba(232, 234, 240, 0.95);
   font-size: 14px;
   outline: none;
@@ -525,7 +525,7 @@ onMounted(() => {
   justify-content: flex-end;
   gap: 12px;
   padding: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid var(--border-color);
 }
 
 .template-error {
@@ -538,7 +538,7 @@ onMounted(() => {
   padding: 12px 16px;
   border-radius: 10px;
   background: rgba(239, 68, 68, 0.9);
-  color: white;
+  color: var(--text-primary);
   font-size: 13px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(10px);

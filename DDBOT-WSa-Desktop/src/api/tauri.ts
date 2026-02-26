@@ -4,7 +4,7 @@ const memoryStorage: Record<string, string> = {
 };
 
 // 仅保留一个Go后端
-const GO_API_BASE = 'http://localhost:15631/api/v1';
+const GO_API_BASE = `/api/v1`;
 
 // 提供纯前端 Web 面板实现
 const invoke: any = async (cmd: string, args?: any) => {
@@ -16,6 +16,7 @@ const invoke: any = async (cmd: string, args?: any) => {
       case 'process_status_text':
         try {
           const res = await fetch(`${GO_API_BASE}/health`);
+          if (res.status === 401) { window.location.hash = '#/login'; return 'stopped'; }
           return res.ok ? 'running' : 'stopped';
         } catch {
           return 'stopped';
@@ -32,7 +33,9 @@ const invoke: any = async (cmd: string, args?: any) => {
         return await obRes.json();
       case 'onebot_status_text':
         try {
-          const obStatus = await fetch(`${GO_API_BASE}/onebot/status`).then(r => r.json());
+          const obRes = await fetch(`${GO_API_BASE}/onebot/status`);
+          if (obRes.status === 401) { window.location.hash = '#/login'; return 'Offline'; }
+          const obStatus = await obRes.json();
           return obStatus.online ? 'Online' : 'Offline';
         } catch {
           return 'Offline';
@@ -42,7 +45,9 @@ const invoke: any = async (cmd: string, args?: any) => {
         return await subRes.json();
       case 'subs_summary_text':
         try {
-          const subData = await fetch(`${GO_API_BASE}/subs/summary`).then(r => r.json());
+          const subRes = await fetch(`${GO_API_BASE}/subs/summary`);
+          if (subRes.status === 401) { window.location.hash = '#/login'; return 'Offline'; }
+          const subData = await subRes.json();
           return `${subData.total} Subs`;
         } catch {
           return 'Offline';
@@ -53,6 +58,7 @@ const invoke: any = async (cmd: string, args?: any) => {
         const filename = args?.filename || 'application.yaml';
         try {
           const cfgRes = await fetch(`/api/config?filename=${filename}`);
+          if (cfgRes.status === 401) { window.location.hash = '#/login'; return ''; }
           if (cfgRes.ok) {
             const data = await cfgRes.json();
             return data.content;
@@ -72,11 +78,12 @@ const invoke: any = async (cmd: string, args?: any) => {
           // Wait, if it's already string, we just send it.
           const textContent = typeof contentObj === 'string' ? contentObj : JSON.stringify(contentObj, null, 2);
 
-          await fetch(`/api/config`, {
+          const res = await fetch(`/api/config`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ filename: writeFilename, content: textContent })
           });
+          if (res.status === 401) { window.location.hash = '#/login'; return null; }
 
           // Trigger hot-reload in Go Main process if it's running
           if (writeFilename === 'application.yaml') {
@@ -97,6 +104,7 @@ const invoke: any = async (cmd: string, args?: any) => {
           const linesLimit = args?.lines || 100;
           const levelQuery = args?.level ? `&level=${args.level}` : '';
           const logRes = await fetch(`/api/logs?lines=${linesLimit}${levelQuery}`);
+          if (logRes.status === 401) { window.location.hash = '#/login'; return []; }
           if (logRes.ok) {
             const data = await logRes.json();
             if (data.logs && data.logs.length > 0) {

@@ -59,8 +59,8 @@ function handleBlur(event: FocusEvent) {
   padding: 8px 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(232, 234, 240, 0.95);
+  background: var(--bg-card);
+  color: var(--text-primary);
   font-size: 13px;
   outline: none;
   transition: all 0.2s ease;
@@ -68,7 +68,7 @@ function handleBlur(event: FocusEvent) {
 
 .input:focus {
   border-color: rgba(124, 92, 255, 0.5);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--border-color);
 }
 
 .input--error {
@@ -96,6 +96,6 @@ function handleBlur(event: FocusEvent) {
 }
 
 .input::placeholder {
-  color: rgba(232, 234, 240, 0.4);
+  color: var(--text-secondary);
 }
 </style>

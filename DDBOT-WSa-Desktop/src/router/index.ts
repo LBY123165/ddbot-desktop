@@ -8,6 +8,7 @@ import GraphicalConfigEditor from '../pages/GraphicalConfigEditor.vue'
 import LogsPage from '../pages/LogsPage.vue'
 import TemplateCenter from '../pages/TemplateCenter.vue'
 import SubscriptionManager from '../pages/SubscriptionManager.vue'
+import Login from '../pages/Login.vue'
 
 const routes = [
   {
@@ -57,6 +58,12 @@ const routes = [
     name: 'Setup',
     component: SetupWizard,
     meta: { title: '初始设置' },
+  },
+  {
+    path: '/login',
+    name: 'Login',
+    component: Login,
+    meta: { title: '身份验证' },
   },
 ]
 

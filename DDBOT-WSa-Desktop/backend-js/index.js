@@ -9,9 +9,85 @@ const https = require('https');
 const AdmZip = require('adm-zip');
 const tar = require('tar');
 const axios = require('axios');
+const { createProxyMiddleware } = require('http-proxy-middleware');
+const cookieParser = require('cookie-parser');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Default Admin Password (Can be overridden by env variable or local config file)
+let ADMIN_PASSWORD = process.env.WEBUI_PASSWORD || 'ddbot_admin';
+try {
+    const cfgPath = path.join(__dirname, 'server-config.json');
+    if (fs.existsSync(cfgPath)) {
+        const localConfig = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+        if (localConfig.ADMIN_PASSWORD) {
+            ADMIN_PASSWORD = localConfig.ADMIN_PASSWORD;
+        }
+    }
+} catch (e) {
+    // Ignore initial parse errors
+}
+
+// Check for duplicate middlewares and remove them
+
+// Middleware to parse cookies
+app.use(cookieParser());
+const authMiddleware = (req, res, next) => {
+    // Determine the true client IP (handling reverse proxies if configured)
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
+
+    // Normalize IPv6 mapped IPv4
+    const normalizedIp = clientIp.replace(/^.*:/, '');
+
+    const isPrivateIp = (ip) => {
+        return ip === '127.0.0.1' ||
+            ip === 'localhost' ||
+            ip.startsWith('192.168.') ||
+            ip.startsWith('10.') ||
+            /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip);
+    };
+
+    if (isPrivateIp(normalizedIp)) {
+        // Internal IP -> Bypass Auth
+        return next();
+    }
+
+    // Always allow the login route so users can authenticate
+    if (req.path === '/api/auth/login') {
+        return next();
+    }
+
+    // External IP -> Require Auth Token
+    const token = req.cookies.auth_token || req.headers['authorization'];
+    if (token === ADMIN_PASSWORD) {
+        return next();
+    }
+
+    // Unauthenticated
+    // Distinguish between API requests and page requests
+    if (req.path.startsWith('/api')) {
+        return res.status(401).json({ error: 'Unauthorized: External access requires authentication.' });
+    } else {
+        // For HTML page requests, let it serve the index, the Vue router will handle the login redirect if API fails
+        return next();
+    }
+};
+
+app.use(authMiddleware);
+
+// Set up Reverse Proxy for the Go Admin API BEFORE body parsers to stream smoothly
+app.use('/api/v1', createProxyMiddleware({
+    target: 'http://127.0.0.1:15631',
+    changeOrigin: true,
+    pathRewrite: { '^/api/v1': '/api/v1' } // Preserve path
+}));
+
+app.use('/api/admin', createProxyMiddleware({
+    target: 'http://127.0.0.1:15631',
+    changeOrigin: true,
+    pathRewrite: { '^/api/admin': '/api/admin' } // Preserve path
+}));
 
 // 静态文件托管：将前端构建产物（dist）直接部署在根路径
 const distPath = path.join(__dirname, '..', 'dist');
@@ -48,6 +124,56 @@ function findDdbotExecutable(dir) {
 }
 
 // APIs
+
+// Login Route for External Users
+app.post('/api/auth/login', (req, res) => {
+    const { password } = req.body;
+    if (password === ADMIN_PASSWORD) {
+        // Issue token as an HttpOnly cookie valid for 30 days
+        res.cookie('auth_token', password, {
+            maxAge: 30 * 24 * 60 * 60 * 1000,
+            httpOnly: false, // Accessible by frontend if needed, or keeping it strictly server tracked
+            secure: process.env.NODE_ENV === 'production'
+        });
+        res.json({ success: true, message: 'Logged in successfully' });
+    } else {
+        res.status(401).json({ error: 'Invalid password' });
+    }
+});
+
+// Update Password Route (Internal UI Configuration)
+app.post('/api/auth/update_password', (req, res) => {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 3) {
+        return res.status(400).json({ error: '新密码无效，至少需要3个字符' });
+    }
+
+    // In-memory overwrite of password globally
+    ADMIN_PASSWORD = newPassword;
+
+    // Try to physically store it into a local config.json file next to index.js
+    const configPath = path.join(__dirname, 'server-config.json');
+    try {
+        let config = {};
+        if (fs.existsSync(configPath)) {
+            config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        }
+        config.ADMIN_PASSWORD = newPassword;
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+    } catch (err) {
+        console.error("Failed to persist password change to disk:", err);
+    }
+
+    // Expire current cookies so the user has to login
+    res.clearCookie('auth_token');
+    res.json({ success: true, message: 'Password updated successfully' });
+});
+
+// Logout Route
+app.post('/api/auth/logout', (req, res) => {
+    res.clearCookie('auth_token');
+    res.json({ success: true });
+});
 
 // 健康检查
 app.get('/api/health', (req, res) => {

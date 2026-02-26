@@ -1,5 +1,5 @@
 <template>
-  <div style="padding: 20px; color: white;">
+  <div style="padding: 20px; color: var(--text-primary);">
     <h1>测试页面</h1>
     <p>如果你能看到这个页面，说明基本的 Vue + Tauri 环境是正常的。</p>
     <div style="margin-top: 20px;">
@@ -18,7 +18,7 @@
         <input 
           id="downloadUrl" 
           v-model="downloadUrl" 
-          style="margin-left: 10px; padding: 5px; width: 400px; background: #333; color: white; border: 1px solid #555;"
+          style="margin-left: 10px; padding: 5px; width: 400px; background: #333; color: var(--text-primary); border: 1px solid #555;"
         />
       </div>
       <div style="margin-top: 10px;">
@@ -26,7 +26,7 @@
         <input 
           id="savePath" 
           v-model="savePath" 
-          style="margin-left: 10px; padding: 5px; width: 400px; background: #333; color: white; border: 1px solid #555;"
+          style="margin-left: 10px; padding: 5px; width: 400px; background: #333; color: var(--text-primary); border: 1px solid #555;"
         />
       </div>
       <div style="margin-top: 10px;">
@@ -34,7 +34,7 @@
         <input 
           id="filename" 
           v-model="filename" 
-          style="margin-left: 10px; padding: 5px; width: 400px; background: #333; color: white; border: 1px solid #555;"
+          style="margin-left: 10px; padding: 5px; width: 400px; background: #333; color: var(--text-primary); border: 1px solid #555;"
         />
       </div>
       <button @click="testDownload" style="margin-top: 20px; padding: 10px;">开始下载</button>
